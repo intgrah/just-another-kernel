@@ -1,0 +1,13 @@
+.{
+    .name = .just_another_kernel,
+    .version = "0.0.0",
+    .fingerprint = 0xf5ad2e2338471579,
+    .minimum_zig_version = "0.16.0",
+    .dependencies = .{
+        .clap = .{
+            .url = "https://github.com/Hejsil/zig-clap/archive/refs/tags/0.12.0.tar.gz",
+            .hash = "clap-0.12.0-oBajB7foAQDqlSwaSG5g0yq7xGbQARUsBk5T64gAOqP5",
+        },
+    },
+    .paths = .{ "build.zig", "build.zig.zon", "src" },
+}
