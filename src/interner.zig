@@ -135,7 +135,13 @@ fn Interner(comptime T: type) type {
 
         pub fn insertUnique(self: *Self, ar: *Arena, v: T) *const T {
             self.maybeGrow();
-            const h = structHashRef(T, &v);
+            const r = ar.create(T);
+            r.* = v;
+            self.placeUniqueRef(structHashRef(T, r), r);
+            return r;
+        }
+
+        fn placeUniqueRef(self: *Self, h: u64, r: Slot) void {
             const f = h2(h);
             const mask = self.cap - 1;
             var pos = h & mask;
@@ -145,23 +151,56 @@ fn Interner(comptime T: type) type {
                 var m = matchByte(g, f);
                 while (m != 0) {
                     const i = (pos + @ctz(m)) & mask;
-                    if (refEql(T, self.slots[i], &v)) @panic("Attempted to insert duplicate");
+                    if (refEql(T, self.slots[i], r)) @panic("Attempted to insert duplicate");
                     m &= m - 1;
                 }
                 const empties = matchByte(g, ctrl_empty);
                 if (empties != 0) {
                     const i = (pos + @ctz(empties)) & mask;
-                    const r = ar.create(T);
-                    r.* = v;
                     self.setCtrl(i, f);
                     self.slots[i] = r;
                     self.count += 1;
                     self.growth_left -= 1;
-                    return r;
+                    return;
                 }
                 pos = (pos + stride) & mask;
                 stride += 16;
             }
+        }
+
+        pub const BuildEntry = struct { hash: u64, ref: Slot };
+
+        pub fn buildUnique(self: *Self, entries: []BuildEntry) void {
+            std.debug.assert(self.count == 0);
+            if (entries.len == 0) return;
+            var newcap: usize = 16;
+            while (maxLoad(newcap) < entries.len) newcap *= 2;
+            self.allocCap(newcap);
+            const bits: usize = @ctz(newcap);
+            const scratch = smp_allocator.alloc(BuildEntry, entries.len) catch util.oom();
+            defer smp_allocator.free(scratch);
+            var src: []BuildEntry = entries;
+            var dst: []BuildEntry = scratch;
+            var shift: usize = 0;
+            while (shift < bits) : (shift += 8) {
+                var counts = [_]usize{0} ** 256;
+                for (src) |e| counts[(e.hash >> @intCast(shift)) & 0xff] += 1;
+                var sum: usize = 0;
+                for (&counts) |*c| {
+                    const t = c.*;
+                    c.* = sum;
+                    sum += t;
+                }
+                for (src) |e| {
+                    const d = (e.hash >> @intCast(shift)) & 0xff;
+                    dst[counts[d]] = e;
+                    counts[d] += 1;
+                }
+                const tmp = src;
+                src = dst;
+                dst = tmp;
+            }
+            for (src) |e| self.placeUniqueRef(e.hash, e.ref);
         }
 
         pub fn deinit(self: *Self) void {

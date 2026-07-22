@@ -2,6 +2,7 @@ const std = @import("std");
 const util = @import("util.zig");
 const Arena = @import("Arena.zig");
 const hash64 = @import("hash.zig").hash64;
+const interner = @import("interner.zig");
 const swiss_map = @import("swiss_map.zig");
 const env = @import("env.zig");
 const expr = @import("expr.zig");
@@ -79,6 +80,7 @@ pub const Parser = struct {
     names_by_idx: std.ArrayList(NamePtr),
     levels_by_idx: std.ArrayList(LevelPtr),
     exprs_by_idx: std.ArrayList(ExprPtr),
+    pending_exprs: std.ArrayList(interner.ExprInterner.BuildEntry),
     declars: env.DeclarMap,
     config: Config,
     skipped: std.ArrayList([]const u8),
@@ -101,6 +103,7 @@ pub const Parser = struct {
             .names_by_idx = names_by_idx,
             .levels_by_idx = levels_by_idx,
             .exprs_by_idx = .empty,
+            .pending_exprs = .empty,
             .declars = swiss_map.FxIndexMap(NamePtr, Declar).empty,
             .config = config,
             .skipped = .empty,
@@ -141,6 +144,8 @@ pub fn parseExportFile(ar: *Arena, input: []const u8, config: Config) ParseError
         parser.line_num += 1;
     }
 
+    parser.dag.exprs.buildUnique(parser.pending_exprs.items);
+    parser.pending_exprs.deinit(util.smp_allocator);
     parser.names_by_idx.deinit(util.smp_allocator);
     parser.levels_by_idx.deinit(util.smp_allocator);
     parser.exprs_by_idx.deinit(util.smp_allocator);
@@ -177,7 +182,10 @@ fn pushLevel(self: *Parser, expected: BackRef, l: Level) void {
 }
 
 fn pushExpr(self: *Parser, expected: BackRef, e: Expr) void {
-    const ptr = ExprPtr.global(self.dag.exprs.insertUnique(self.arena, e));
+    const r = self.arena.create(Expr);
+    r.* = e;
+    self.pending_exprs.append(util.smp_allocator, .{ .hash = e.hash, .ref = r }) catch util.oom();
+    const ptr = ExprPtr.global(r);
     const i = @as(usize, expected.index());
     if (i >= self.exprs_by_idx.items.len) {
         resizeOpt(ExprPtr, &self.exprs_by_idx, i + 1, expr_nil);
