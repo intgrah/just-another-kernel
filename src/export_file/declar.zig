@@ -18,11 +18,11 @@ const RecRule = env.RecRule;
 const Parser = parser.Parser;
 const ParseError = parser.ParseError;
 const fail = parser.fail;
-const JVal = json.JVal;
+const Value = json.Value;
 
 const DefinitionSafety = enum { unsafe_, safe, partial };
 
-fn parseSafety(v: JVal) ParseError!DefinitionSafety {
+fn parseSafety(v: Value) ParseError!DefinitionSafety {
     const s = try json.asStr(v);
     if (std.mem.eql(u8, s, "unsafe")) return .unsafe_;
     if (std.mem.eql(u8, s, "safe")) return .safe;
@@ -30,7 +30,7 @@ fn parseSafety(v: JVal) ParseError!DefinitionSafety {
     return fail("unknown safety");
 }
 
-fn parseReducibilityHint(v: JVal) ParseError!ReducibilityHint {
+fn parseReducibilityHint(v: Value) ParseError!ReducibilityHint {
     switch (v) {
         .string => |s| {
             if (std.mem.eql(u8, s, "opaque")) return .opaque_;
@@ -110,7 +110,7 @@ fn insertDeclar(self: *Parser, n: NamePtr, d: Declar) ParseError!void {
     self.declars.put(util.smp_allocator, n, d) catch util.oom();
 }
 
-pub fn parseAxiom(self: *Parser, ta: std.mem.Allocator, v: JVal) ParseError!void {
+pub fn parseAxiom(self: *Parser, ta: std.mem.Allocator, v: Value) ParseError!void {
     const o = try json.asObject(v);
     const is_unsafe = try json.asBool(o.get("isUnsafe") orelse return fail("missing isUnsafe"));
     if (is_unsafe) return fail("unsafe declarations are not supported");
@@ -132,7 +132,7 @@ pub fn parseAxiom(self: *Parser, ta: std.mem.Allocator, v: JVal) ParseError!void
     }
 }
 
-pub fn parseDef(self: *Parser, ta: std.mem.Allocator, v: JVal) ParseError!void {
+pub fn parseDef(self: *Parser, ta: std.mem.Allocator, v: Value) ParseError!void {
     const o = try json.asObject(v);
     const safety = try parseSafety(o.get("safety") orelse return fail("missing safety"));
     if (safety != .safe) return fail("unsafe and partial definitions are not supported");
@@ -146,7 +146,7 @@ pub fn parseDef(self: *Parser, ta: std.mem.Allocator, v: JVal) ParseError!void {
     try insertDeclar(self, dname, definition);
 }
 
-pub fn parseThm(self: *Parser, ta: std.mem.Allocator, v: JVal) ParseError!void {
+pub fn parseThm(self: *Parser, ta: std.mem.Allocator, v: Value) ParseError!void {
     const o = try json.asObject(v);
     const tname = try item.getNamePtr(self, try json.asU32(o.get("name") orelse return fail("missing name")));
     const ty = try item.getExprPtr(self, try json.asU32(o.get("type") orelse return fail("missing type")));
@@ -157,7 +157,7 @@ pub fn parseThm(self: *Parser, ta: std.mem.Allocator, v: JVal) ParseError!void {
     try insertDeclar(self, tname, theorem);
 }
 
-pub fn parseOpaque(self: *Parser, ta: std.mem.Allocator, v: JVal) ParseError!void {
+pub fn parseOpaque(self: *Parser, ta: std.mem.Allocator, v: Value) ParseError!void {
     const o = try json.asObject(v);
     const is_unsafe = try json.asBool(o.get("isUnsafe") orelse return fail("missing isUnsafe"));
     if (is_unsafe) return fail("unsafe declarations are not supported");
@@ -170,7 +170,7 @@ pub fn parseOpaque(self: *Parser, ta: std.mem.Allocator, v: JVal) ParseError!voi
     try insertDeclar(self, oname, definition);
 }
 
-pub fn parseQuot(self: *Parser, ta: std.mem.Allocator, v: JVal) ParseError!void {
+pub fn parseQuot(self: *Parser, ta: std.mem.Allocator, v: Value) ParseError!void {
     const o = try json.asObject(v);
     const qname = try item.getNamePtr(self, try json.asU32(o.get("name") orelse return fail("missing name")));
     const ty = try item.getExprPtr(self, try json.asU32(o.get("type") orelse return fail("missing type")));
@@ -180,7 +180,7 @@ pub fn parseQuot(self: *Parser, ta: std.mem.Allocator, v: JVal) ParseError!void 
     try insertDeclar(self, qname, quot);
 }
 
-pub fn parseInductive(self: *Parser, ta: std.mem.Allocator, v: JVal) ParseError!void {
+pub fn parseInductive(self: *Parser, ta: std.mem.Allocator, v: Value) ParseError!void {
     const o = try json.asObject(v);
     const ind_vals = try json.asArray(o.get("types") orelse return fail("missing types"));
     const ctor_vals = try json.asArray(o.get("ctors") orelse return fail("missing ctors"));

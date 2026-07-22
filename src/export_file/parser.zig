@@ -23,7 +23,7 @@ const Name = name.Name;
 const Level = level.Level;
 const BinderStyle = expr.BinderStyle;
 const Declar = env.Declar;
-const JVal = json.JVal;
+const Value = json.Value;
 
 const min_semver = std.SemanticVersion{ .major = 3, .minor = 1, .patch = 0 };
 const max_semver = std.SemanticVersion{ .major = 3, .minor = 2, .patch = 0 };
@@ -204,12 +204,12 @@ const kind_map = std.StaticStringMap(Kind).initComptime(.{
     .{ "inductive", .inductive },
 });
 
-fn kindv(kind: ?Kind, kv: JVal, comptime tag: Kind) ?JVal {
+fn kindv(kind: ?Kind, kv: Value, comptime tag: Kind) ?Value {
     if (kind != null and kind.? == tag) return kv;
     return null;
 }
 
-fn parseBinderStyle(v: JVal) ParseError!BinderStyle {
+fn parseBinderStyle(v: Value) ParseError!BinderStyle {
     return item.binderStyleOf(try json.asStr(v)) orelse fail("unknown binderInfo");
 }
 
@@ -221,8 +221,8 @@ fn parseLine(self: *Parser, ta: std.mem.Allocator, line: []const u8) ParseError!
         error.ParseFailed => return error.ParseFailed,
     }
 
-    var jp = json.Jp{ .s = line, .i = 0, .a = ta };
-    const obj = try jp.value();
+    var json_parser = json.Parser{ .s = line, .i = 0, .a = ta };
+    const obj = try json_parser.value();
     switch (obj) {
         .object => {},
         else => return fail("export line is not a JSON object"),
@@ -230,7 +230,7 @@ fn parseLine(self: *Parser, ta: std.mem.Allocator, line: []const u8) ParseError!
 
     var assigned_idx: ?BackRef = null;
     var kk: []const u8 = "";
-    var kv: JVal = JVal.nul;
+    var kv: Value = Value.nul;
     for (obj.object) |m| {
         if (m.key.len == 2 and m.key[0] == 'i') {
             const backref_kind: ?BackRefKind = switch (m.key[1]) {

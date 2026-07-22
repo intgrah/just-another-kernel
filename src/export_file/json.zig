@@ -4,17 +4,17 @@ const parser = @import("parser.zig");
 const ParseError = parser.ParseError;
 const fail = parser.fail;
 
-pub const Member = struct { key: []const u8, value: JVal };
+pub const Member = struct { key: []const u8, value: Value };
 
-pub const JVal = union(enum) {
+pub const Value = union(enum) {
     object: []const Member,
-    array: []const JVal,
+    array: []const Value,
     string: []const u8,
     number: []const u8,
     boolean: bool,
     nul: void,
 
-    pub fn get(self: JVal, key: []const u8) ?JVal {
+    pub fn get(self: Value, key: []const u8) ?Value {
         switch (self) {
             .object => |ms| {
                 for (ms) |m| {
@@ -37,42 +37,42 @@ fn parseUint(comptime T: type, s: []const u8) ParseError!T {
     return std.math.cast(T, x) orelse fail("integer out of range");
 }
 
-pub fn asU32(v: JVal) ParseError!u32 {
+pub fn asU32(v: Value) ParseError!u32 {
     return switch (v) {
         .number => |s| parseUint(u32, s),
         else => fail("expected integer"),
     };
 }
 
-pub fn asU16(v: JVal) ParseError!u16 {
+pub fn asU16(v: Value) ParseError!u16 {
     return switch (v) {
         .number => |s| parseUint(u16, s),
         else => fail("expected integer"),
     };
 }
 
-pub fn asUsize(v: JVal) ParseError!usize {
+pub fn asUsize(v: Value) ParseError!usize {
     return switch (v) {
         .number => |s| parseUint(usize, s),
         else => fail("expected integer"),
     };
 }
 
-pub fn asBool(v: JVal) ParseError!bool {
+pub fn asBool(v: Value) ParseError!bool {
     return switch (v) {
         .boolean => |b| b,
         else => fail("expected bool"),
     };
 }
 
-pub fn asStr(v: JVal) ParseError![]const u8 {
+pub fn asStr(v: Value) ParseError![]const u8 {
     return switch (v) {
         .string => |s| s,
         else => fail("expected string"),
     };
 }
 
-pub fn asU32Array(ta: std.mem.Allocator, v: JVal) ParseError![]const u32 {
+pub fn asU32Array(ta: std.mem.Allocator, v: Value) ParseError![]const u32 {
     const arr = switch (v) {
         .array => |a| a,
         else => return fail("expected array"),
@@ -84,26 +84,26 @@ pub fn asU32Array(ta: std.mem.Allocator, v: JVal) ParseError![]const u32 {
     return out;
 }
 
-pub fn asObject(v: JVal) ParseError!JVal {
+pub fn asObject(v: Value) ParseError!Value {
     return switch (v) {
         .object => v,
         else => fail("expected object"),
     };
 }
 
-pub fn asArray(v: JVal) ParseError![]const JVal {
+pub fn asArray(v: Value) ParseError![]const Value {
     return switch (v) {
         .array => |a| a,
         else => fail("expected array"),
     };
 }
 
-pub const Jp = struct {
+pub const Parser = struct {
     s: []const u8,
     i: usize,
     a: std.mem.Allocator,
 
-    fn skipWs(self: *Jp) void {
+    fn skipWs(self: *Parser) void {
         while (self.i < self.s.len) {
             switch (self.s[self.i]) {
                 ' ', '\t', '\n', '\r' => self.i += 1,
@@ -112,39 +112,39 @@ pub const Jp = struct {
         }
     }
 
-    pub fn value(self: *Jp) ParseError!JVal {
+    pub fn value(self: *Parser) ParseError!Value {
         self.skipWs();
         if (self.i >= self.s.len) return fail("unexpected end of JSON");
         switch (self.s[self.i]) {
             '{' => return self.object(),
             '[' => return self.array(),
-            '"' => return JVal{ .string = try self.string() },
+            '"' => return Value{ .string = try self.string() },
             't' => {
                 if (self.i + 4 > self.s.len or !std.mem.eql(u8, self.s[self.i .. self.i + 4], "true")) return fail("invalid literal");
                 self.i += 4;
-                return JVal{ .boolean = true };
+                return Value{ .boolean = true };
             },
             'f' => {
                 if (self.i + 5 > self.s.len or !std.mem.eql(u8, self.s[self.i .. self.i + 5], "false")) return fail("invalid literal");
                 self.i += 5;
-                return JVal{ .boolean = false };
+                return Value{ .boolean = false };
             },
             'n' => {
                 if (self.i + 4 > self.s.len or !std.mem.eql(u8, self.s[self.i .. self.i + 4], "null")) return fail("invalid literal");
                 self.i += 4;
-                return JVal.nul;
+                return Value.nul;
             },
-            else => return JVal{ .number = self.number() },
+            else => return Value{ .number = self.number() },
         }
     }
 
-    fn object(self: *Jp) ParseError!JVal {
+    fn object(self: *Parser) ParseError!Value {
         self.i += 1;
         var members = std.ArrayList(Member).initCapacity(self.a, 12) catch util.oom();
         self.skipWs();
         if (self.i < self.s.len and self.s[self.i] == '}') {
             self.i += 1;
-            return JVal{ .object = members.items };
+            return Value{ .object = members.items };
         }
         while (true) {
             self.skipWs();
@@ -167,16 +167,16 @@ pub const Jp = struct {
             }
             return fail("expected ',' or '}'");
         }
-        return JVal{ .object = members.items };
+        return Value{ .object = members.items };
     }
 
-    fn array(self: *Jp) ParseError!JVal {
+    fn array(self: *Parser) ParseError!Value {
         self.i += 1;
-        var items = std.ArrayList(JVal).initCapacity(self.a, 8) catch util.oom();
+        var items = std.ArrayList(Value).initCapacity(self.a, 8) catch util.oom();
         self.skipWs();
         if (self.i < self.s.len and self.s[self.i] == ']') {
             self.i += 1;
-            return JVal{ .array = items.items };
+            return Value{ .array = items.items };
         }
         while (true) {
             const val = try self.value();
@@ -193,10 +193,10 @@ pub const Jp = struct {
             }
             return fail("expected ',' or ']'");
         }
-        return JVal{ .array = items.items };
+        return Value{ .array = items.items };
     }
 
-    fn number(self: *Jp) []const u8 {
+    fn number(self: *Parser) []const u8 {
         const start = self.i;
         while (self.i < self.s.len) {
             switch (self.s[self.i]) {
@@ -207,7 +207,7 @@ pub const Jp = struct {
         return self.s[start..self.i];
     }
 
-    fn string(self: *Jp) ParseError![]const u8 {
+    fn string(self: *Parser) ParseError![]const u8 {
         self.i += 1;
         const start = self.i;
         var has_escape = false;
@@ -229,7 +229,7 @@ pub const Jp = struct {
         return fail("unterminated string");
     }
 
-    fn unescape(self: *Jp, raw: []const u8) ParseError![]const u8 {
+    fn unescape(self: *Parser, raw: []const u8) ParseError![]const u8 {
         var out = std.ArrayList(u8).empty;
         var k: usize = 0;
         while (k < raw.len) {
