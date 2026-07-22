@@ -29,6 +29,7 @@ pub fn debugPrint(f: *Writer, elem: anytype) Error!void {
         LevelsPtr => return debugLevels(f, elem),
         StringPtr => return debugString(f, elem),
         BigUintPtr => return debugBignum(f, elem),
+        expr.FVarId => return debugFvarId(f, elem),
         *const DeclarInfo, *DeclarInfo => return debugDeclarInfo(f, elem),
         DeclarInfo => return debugDeclarInfo(f, &elem),
         RecRule => return debugRecRule(f, elem),
@@ -39,9 +40,7 @@ pub fn debugPrint(f: *Writer, elem: anytype) Error!void {
     switch (@typeInfo(A)) {
         .optional => {
             if (elem) |x| {
-                try f.writeAll("Some(");
-                try debugPrint(f, x);
-                try f.writeAll(")");
+                try f.print("Some({f})", .{d(x)});
             } else {
                 try f.writeAll("None");
             }
@@ -67,6 +66,19 @@ pub fn debugPrint(f: *Writer, elem: anytype) Error!void {
     @compileError("debug_print: unsupported type " ++ @typeName(A));
 }
 
+fn Formatter(comptime T: type) type {
+    return struct {
+        e: T,
+        pub fn format(self: @This(), w: *Writer) Error!void {
+            return debugPrint(w, self.e);
+        }
+    };
+}
+
+fn d(elem: anytype) Formatter(@TypeOf(elem)) {
+    return .{ .e = elem };
+}
+
 fn debugSlice(f: *Writer, elems: anytype) Error!void {
     try f.writeAll("[");
     for (elems, 0..) |x, i| {
@@ -83,18 +95,12 @@ fn debugName(f: *Writer, elem: NamePtr) Error!void {
             const sfx = s.sfx.asRef().*;
             switch (s.pfx.asRef().kind) {
                 .anon => try f.print("{s}", .{sfx}),
-                else => {
-                    try debugName(f, s.pfx);
-                    try f.print(".{s}", .{sfx});
-                },
+                else => try f.print("{f}.{s}", .{ d(s.pfx), sfx }),
             }
         },
         .num => |n| switch (n.pfx.asRef().kind) {
             .anon => try f.print("{d}", .{n.n}),
-            else => {
-                try debugName(f, n.pfx);
-                try f.print(".{d}", .{n.n});
-            },
+            else => try f.print("{f}.{d}", .{ d(n.pfx), n.n }),
         },
     }
 }
@@ -107,24 +113,11 @@ fn debugLevel(f: *Writer, elem: LevelPtr) Error!void {
             if (val.asRef().kind == .zero) {
                 try f.print("{d}", .{n});
             } else {
-                try debugLevel(f, val);
-                try f.print(" + {d}", .{n});
+                try f.print("{f} + {d}", .{ d(val), n });
             }
         },
-        .max => |m| {
-            try f.writeAll("max(");
-            try debugLevel(f, m.l);
-            try f.writeAll(", ");
-            try debugLevel(f, m.r);
-            try f.writeAll(")");
-        },
-        .imax => |m| {
-            try f.writeAll("imax(");
-            try debugLevel(f, m.l);
-            try f.writeAll(", ");
-            try debugLevel(f, m.r);
-            try f.writeAll(")");
-        },
+        .max => |m| try f.print("max({f}, {f})", .{ d(m.l), d(m.r) }),
+        .imax => |m| try f.print("imax({f}, {f})", .{ d(m.l), d(m.r) }),
         .param => |p| try debugName(f, p),
     }
 }
@@ -132,70 +125,28 @@ fn debugLevel(f: *Writer, elem: LevelPtr) Error!void {
 fn debugExpr(f: *Writer, elem: ExprPtr) Error!void {
     switch (elem.asRef().kind) {
         .@"var" => |v| try f.print("${d}", .{v.dbj_idx}),
-        .sort => |s| {
-            try f.writeAll("Sort(");
-            try debugLevel(f, s.level);
-            try f.writeAll(")");
-        },
-        .@"const" => |c| {
-            const levels = c.levels.asRef();
-            try debugName(f, c.name);
-            try f.writeAll(".");
-            try debugSlice(f, levels);
-        },
-        .app => |a| {
-            try f.writeAll("(");
-            try debugExpr(f, a.fun);
-            try f.writeAll(" ");
-            try debugExpr(f, a.arg);
-            try f.writeAll(")");
-        },
-        .let => |l| {
-            try f.writeAll("let ");
-            try debugName(f, l.data.binder_name);
-            try f.writeAll(" : ");
-            try debugExpr(f, l.data.binder_type);
-            try f.writeAll(" := ");
-            try debugExpr(f, l.data.val);
-            try f.writeAll(" in ");
-            try debugExpr(f, l.data.body);
-        },
-        .pi => |p| {
-            try f.writeAll("Pi (");
-            try debugName(f, p.binder_name);
-            try f.writeAll(" : ");
-            try debugExpr(f, p.binder_type);
-            try f.writeAll("), ");
-            try debugExpr(f, p.body);
-        },
-        .lambda => |la| {
-            try f.writeAll("fun (");
-            try debugName(f, la.binder_name);
-            try f.writeAll(" : ");
-            try debugExpr(f, la.binder_type);
-            try f.writeAll(") => ");
-            try debugExpr(f, la.body);
-        },
-        .local => |lo| {
-            try f.writeAll("#(");
-            try debugName(f, lo.binder_name);
-            try f.writeAll(", ");
-            try debugFvarId(f, lo.id);
-            try f.writeAll(" : ");
-            try debugExpr(f, lo.binder_type);
-            try f.writeAll(")");
-        },
-        .proj => |pr| {
-            try f.writeAll("%(");
-            try debugExpr(f, pr.structure);
-            try f.print(").{d}", .{pr.idx});
-        },
-        .nat_lit => |nl| {
-            try f.print("NLit({any})", .{nl.ptr.asRef()});
-        },
-        .string_lit => |sl| {
-            try f.print("SLit({s})", .{sl.ptr.asRef().*});
-        },
+        .sort => |s| try f.print("Sort({f})", .{d(s.level)}),
+        .@"const" => |c| try f.print("{f}.{f}", .{ d(c.name), d(c.levels.asRef()) }),
+        .app => |a| try f.print("({f} {f})", .{ d(a.fun), d(a.arg) }),
+        .let => |l| try f.print(
+            "let {f} : {f} := {f} in {f}",
+            .{ d(l.data.binder_name), d(l.data.binder_type), d(l.data.val), d(l.data.body) },
+        ),
+        .pi => |p| try f.print(
+            "Pi ({f} : {f}), {f}",
+            .{ d(p.binder_name), d(p.binder_type), d(p.body) },
+        ),
+        .lambda => |la| try f.print(
+            "fun ({f} : {f}) => {f}",
+            .{ d(la.binder_name), d(la.binder_type), d(la.body) },
+        ),
+        .local => |lo| try f.print(
+            "#({f}, {f} : {f})",
+            .{ d(lo.binder_name), d(lo.id), d(lo.binder_type) },
+        ),
+        .proj => |pr| try f.print("%({f}).{d}", .{ d(pr.structure), pr.idx }),
+        .nat_lit => |nl| try f.print("NLit({any})", .{nl.ptr.asRef()}),
+        .string_lit => |sl| try f.print("SLit({s})", .{sl.ptr.asRef().*}),
     }
 }
 
@@ -219,21 +170,17 @@ fn debugBignum(f: *Writer, elem: BigUintPtr) Error!void {
 }
 
 fn debugDeclarInfo(f: *Writer, elem: *const DeclarInfo) Error!void {
-    try f.writeAll("DeclarInfo { name: ");
-    try debugName(f, elem.name);
-    try f.writeAll(", ty: ");
-    try debugExpr(f, elem.ty);
-    try f.writeAll(", uparams: ");
-    try debugSlice(f, elem.uparams.asRef());
-    try f.writeAll(" }");
+    try f.print(
+        "DeclarInfo {{ name: {f}, ty: {f}, uparams: {f} }}",
+        .{ d(elem.name), d(elem.ty), d(elem.uparams) },
+    );
 }
 
 fn debugRecRule(f: *Writer, elem: RecRule) Error!void {
-    try f.writeAll("RecRule { ctor_name: ");
-    try debugName(f, elem.ctor_name);
-    try f.print(", ctor_telescope_size_wo_params: {d}, val: ", .{elem.ctor_telescope_size_wo_params});
-    try debugExpr(f, elem.val);
-    try f.writeAll(" }");
+    try f.print(
+        "RecRule {{ ctor_name: {f}, ctor_telescope_size_wo_params: {d}, val: {f} }}",
+        .{ d(elem.ctor_name), elem.ctor_telescope_size_wo_params, d(elem.val) },
+    );
 }
 
 fn debugReducibilityHint(f: *Writer, elem: ReducibilityHint) Error!void {
