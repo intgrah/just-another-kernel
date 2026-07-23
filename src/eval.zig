@@ -195,16 +195,11 @@ inline fn mkPiHc(
 }
 
 pub fn eval(self: *TypeChecker, depth: u32, e: E, ex: ExprPtr) V {
-    const first = ex.asRef();
-    const bvars = switch (first.kind) {
-        .app => |a| a.num_loose_bvars,
-        .pi => |p| p.num_loose_bvars,
-        .lambda => |l| l.num_loose_bvars,
-        .let => |le| le.data.num_loose_bvars,
-        .proj => |pr| pr.num_loose_bvars,
+    switch (ex.asRef().kind) {
+        .app, .pi, .lambda, .let, .proj => {},
         else => return evalNoCache(self, depth, e, ex),
-    };
-    if (bvars == 0) {
+    }
+    if (ex.numLooseBvars() == 0) {
         return evalClosed(self, depth, e, ex);
     }
     const key = .{ @intFromPtr(e), ex };
@@ -1571,7 +1566,7 @@ pub fn valueToBignum(self: *TypeChecker, depth: u32, v: V) ?BigUint {
 }
 
 fn valueToBignumAt(self: *TypeChecker, depth: u32, v: V, deep: bool) ?BigUint {
-    var succs: u64 = 0;
+    var succs: usize = 0;
     var cur = forceThunk(self, depth, v);
     while (true) {
         switch (cur.*) {

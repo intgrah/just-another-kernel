@@ -24,10 +24,6 @@ const BackRef = parser.BackRef;
 const ParseError = parser.ParseError;
 const fail = parser.fail;
 
-const name_nil: NamePtr = @enumFromInt(0);
-const level_nil: LevelPtr = @enumFromInt(0);
-const expr_nil: ExprPtr = @enumFromInt(0);
-
 fn resizeOpt(comptime T: type, list: *std.ArrayList(T), new_len: usize, nil: T) void {
     const old_len = list.items.len;
     list.resize(util.smp_allocator, new_len) catch util.oom();
@@ -37,7 +33,7 @@ fn resizeOpt(comptime T: type, list: *std.ArrayList(T), new_len: usize, nil: T) 
 fn pushName(self: *Parser, expected: BackRef, n: Name) void {
     const i = @as(usize, expected.index());
     if (i >= self.names_by_idx.items.len) {
-        resizeOpt(NamePtr, &self.names_by_idx, i + 1, name_nil);
+        resizeOpt(NamePtr, &self.names_by_idx, i + 1, NamePtr.nil);
     }
     self.names_by_idx.items[i] = NamePtr.global(self.dag.names.insertUnique(self.arena, n));
 }
@@ -45,7 +41,7 @@ fn pushName(self: *Parser, expected: BackRef, n: Name) void {
 fn pushLevel(self: *Parser, expected: BackRef, l: Level) void {
     const i = @as(usize, expected.index());
     if (i >= self.levels_by_idx.items.len) {
-        resizeOpt(LevelPtr, &self.levels_by_idx, i + 1, level_nil);
+        resizeOpt(LevelPtr, &self.levels_by_idx, i + 1, LevelPtr.nil);
     }
     self.levels_by_idx.items[i] = LevelPtr.global(self.dag.levels.insertUnique(self.arena, l));
 }
@@ -56,7 +52,7 @@ fn pushExpr(self: *Parser, expected: BackRef, e: Expr) void {
     self.pending_exprs.append(util.smp_allocator, .{ .hash = e.hash, .ref = r }) catch util.oom();
     const i = @as(usize, expected.index());
     if (i >= self.exprs_by_idx.items.len) {
-        resizeOpt(ExprPtr, &self.exprs_by_idx, i + 1, expr_nil);
+        resizeOpt(ExprPtr, &self.exprs_by_idx, i + 1, ExprPtr.nil);
     }
     self.exprs_by_idx.items[i] = ExprPtr.global(r);
 }
@@ -64,7 +60,7 @@ fn pushExpr(self: *Parser, expected: BackRef, e: Expr) void {
 pub fn getNamePtr(self: *const Parser, idx: u32) ParseError!NamePtr {
     if (idx < self.names_by_idx.items.len) {
         const p = self.names_by_idx.items[idx];
-        if (p != name_nil) return p;
+        if (p != NamePtr.nil) return p;
     }
     return fail("export references name index before it is defined");
 }
@@ -72,7 +68,7 @@ pub fn getNamePtr(self: *const Parser, idx: u32) ParseError!NamePtr {
 pub fn getLevelPtr(self: *const Parser, idx: u32) ParseError!LevelPtr {
     if (idx < self.levels_by_idx.items.len) {
         const p = self.levels_by_idx.items[idx];
-        if (p != level_nil) return p;
+        if (p != LevelPtr.nil) return p;
     }
     return fail("export references level index before it is defined");
 }
@@ -80,7 +76,7 @@ pub fn getLevelPtr(self: *const Parser, idx: u32) ParseError!LevelPtr {
 pub fn getExprPtr(self: *const Parser, idx: u32) ParseError!ExprPtr {
     if (idx < self.exprs_by_idx.items.len) {
         const p = self.exprs_by_idx.items[idx];
-        if (p != expr_nil) return p;
+        if (p != ExprPtr.nil) return p;
     }
     return fail("export references expression index before it is defined");
 }
@@ -193,8 +189,6 @@ pub fn doApp(self: *Parser, idx: BackRef, fn_idx: u32, arg_idx: u32) ParseError!
     pushExpr(self, idx, .mk(.{ .app = .{
         .fun = fun,
         .arg = arg,
-        .num_loose_bvars = @max(fun.asRef().numLooseBvars(), arg.asRef().numLooseBvars()),
-        .has_fvars = fun.asRef().hasFvars() or arg.asRef().hasFvars(),
     } }));
 }
 
@@ -212,8 +206,6 @@ pub fn doLam(self: *Parser, idx: BackRef, name_idx: u32, type_idx: u32, body_idx
         .binder_style = style,
         .binder_type = binder_type,
         .body = body,
-        .num_loose_bvars = @max(binder_type.asRef().numLooseBvars(), (body.asRef().numLooseBvars() -| 1)),
-        .has_fvars = binder_type.asRef().hasFvars() or body.asRef().hasFvars(),
     } }));
 }
 
@@ -226,8 +218,6 @@ pub fn doPi(self: *Parser, idx: BackRef, name_idx: u32, type_idx: u32, body_idx:
         .binder_style = style,
         .binder_type = binder_type,
         .body = body,
-        .num_loose_bvars = @max(binder_type.asRef().numLooseBvars(), (body.asRef().numLooseBvars() -| 1)),
-        .has_fvars = binder_type.asRef().hasFvars() or body.asRef().hasFvars(),
     } }));
 }
 
@@ -242,11 +232,6 @@ pub fn doLet(self: *Parser, idx: BackRef, name_idx: u32, type_idx: u32, value_id
         .binder_type = binder_type,
         .val = val,
         .body = body,
-        .num_loose_bvars = @max(
-            binder_type.asRef().numLooseBvars(),
-            @max(val.asRef().numLooseBvars(), (body.asRef().numLooseBvars() -| 1)),
-        ),
-        .has_fvars = binder_type.asRef().hasFvars() or val.asRef().hasFvars() or body.asRef().hasFvars(),
         .nondep = nondep,
     };
     pushExpr(self, idx, .mk(.{ .let = .{ .data = d } }));
@@ -259,7 +244,5 @@ pub fn doProj(self: *Parser, idx: BackRef, ty_name_idx: u32, proj_idx: usize, st
         .ty_name = ty_name,
         .idx = proj_idx,
         .structure = structure,
-        .num_loose_bvars = structure.asRef().numLooseBvars(),
-        .has_fvars = structure.asRef().hasFvars(),
     } }));
 }

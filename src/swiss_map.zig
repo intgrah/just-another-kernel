@@ -99,7 +99,7 @@ pub fn SwissMap(comptime K: type, comptime Val: type, comptime Ctx: type) type {
             const h = mix(Ctx.hash(.{}, key));
             const f = h2(h);
             const mask = self.cap - 1;
-            var pos = h & mask;
+            var pos: usize = @intCast(h & mask);
             var stride: usize = 16;
             while (true) {
                 const g = self.loadGroup(pos);
@@ -122,7 +122,7 @@ pub fn SwissMap(comptime K: type, comptime Val: type, comptime Ctx: type) type {
             const h = mix(Ctx.hash(.{}, key));
             const f = h2(h);
             const mask = self.cap - 1;
-            var pos = h & mask;
+            var pos: usize = @intCast(h & mask);
             var stride: usize = 16;
             while (true) {
                 const g = self.loadGroup(pos);
@@ -165,7 +165,7 @@ pub fn SwissMap(comptime K: type, comptime Val: type, comptime Ctx: type) type {
             const h = mix(Ctx.hash(.{}, key));
             const f = h2(h);
             const mask = self.cap - 1;
-            var pos = h & mask;
+            var pos: usize = @intCast(h & mask);
             var stride: usize = 16;
             while (true) {
                 const g = self.loadGroup(pos);

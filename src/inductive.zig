@@ -287,9 +287,9 @@ fn specializeNested(
     try specializeNestedAux(self, &st);
 
     for (st.all_inductives_incl_specialized.items) |ind| {
-        util.assert(!ind.ty.asRef().hasFvars());
+        util.assert(!ind.ty.hasFvars());
         for (ind.ctors.items) |c| {
-            util.assert(!c.ty.asRef().hasFvars());
+            util.assert(!c.ty.hasFvars());
         }
     }
     return st;
@@ -306,7 +306,7 @@ fn specializeNestedAux(self: *TypeChecker, st: *InductiveCheckState) tc.Reject!v
             const ctor_type_instd = glp[1];
             const replaced_ctor_wo_params = try replaceAllNested(self, ctor_type_instd, st, &ctor_local_params);
             const replaced_ctor_w_params = expr.abstrPis(self.ctx, ctor_local_params.items, replaced_ctor_wo_params);
-            util.assert(!replaced_ctor_w_params.asRef().hasFvars());
+            util.assert(!replaced_ctor_w_params.hasFvars());
             new_ctors_for_i.append(self.ctx.bump, CtorHeader{ .name = adjusted_ctor.name, .ty = replaced_ctor_w_params }) catch util.oom();
         }
         if (i < st.all_inductives_incl_specialized.items.len) {
@@ -445,7 +445,7 @@ fn isNestedIndApp(self: *TypeChecker, st: *const InductiveCheckState, e: ExprPtr
     var i: usize = 0;
     while (i < @as(usize, num_params)) : (i += 1) {
         const this_param = args.items[i];
-        if (expr.numLooseBvars(this_param) != 0) {
+        if (this_param.numLooseBvars() != 0) {
             loose_bvars = true;
         }
         const FindCtx = struct {

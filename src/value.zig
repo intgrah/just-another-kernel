@@ -50,7 +50,7 @@ pub const Elim = struct {
         return .{ .a = @intFromPtr(v), .b = 0 };
     }
     pub fn mkProj(ty_name: NamePtr, idx: usize) Elim {
-        return .{ .a = @intFromEnum(ty_name) | 1, .b = idx };
+        return .{ .a = ty_name.lowTagged(), .b = idx };
     }
     pub fn isApp(self: Elim) bool {
         return self.a & 1 == 0;
@@ -59,7 +59,7 @@ pub const Elim = struct {
         return @ptrFromInt(self.a);
     }
     pub fn projTyName(self: Elim) NamePtr {
-        return @enumFromInt(self.a & ~@as(usize, 1));
+        return NamePtr.fromLowTagged(self.a);
     }
     pub fn projIdx(self: Elim) usize {
         return self.b;

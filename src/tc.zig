@@ -246,7 +246,7 @@ pub fn checkDeclarInfo(self: *TypeChecker, d: *const Declar) Reject!void {
     if (!level.noDupesAllParams(self.ctx, info.uparams)) {
         return reject("duplicate universe parameters in declaration", .{});
     }
-    if (expr.hasFvars(info.ty)) {
+    if (info.ty.hasFvars()) {
         return reject("declaration type contains free variables", .{});
     }
     const inferred_type = try infer(self, info.ty, .Check);
@@ -389,7 +389,7 @@ pub fn tryReduceNat(self: *TypeChecker, e: ExprPtr) ?ExprPtr {
     if (!self.ctx.export_file.config.nat_extension) {
         return null;
     }
-    if (expr.hasFvars(e)) {
+    if (e.hasFvars()) {
         return null;
     }
     const ua = expr.unfoldApps(self.ctx.bump, e);
@@ -475,7 +475,7 @@ fn inferProj(self: *TypeChecker, _ty_name: NamePtr, idx: usize, structure: ExprP
             ctor_ty = whnf(self, ctor_ty);
             switch (ctor_ty.asRef().kind) {
                 .pi => |p| {
-                    if (expr.numLooseBvars(p.body) != 0) {
+                    if (p.body.numLooseBvars() != 0) {
                         if (structure_ty_is_prop and !isProposition(self, p.binder_type)[0]) {
                             return reject("projection of a non-proof field from a Prop structure", .{});
                         }

@@ -37,17 +37,10 @@ fn feedPayload(hasher: *FxHasher, payload: anytype) void {
         .@"struct" => |s| if (@hasDecl(T, "getHash")) {
             hasher.writeU64(payload.getHash());
         } else inline for (s.fields) |f| {
-            if (comptime !isDerived(f.name)) {
-                feedPayload(hasher, @field(payload, f.name));
-            }
+            feedPayload(hasher, @field(payload, f.name));
         },
         else => hasher.writeU64(toU64(payload)),
     }
-}
-
-fn isDerived(field_name: []const u8) bool {
-    return std.mem.eql(u8, field_name, "num_loose_bvars") or
-        std.mem.eql(u8, field_name, "has_fvars");
 }
 
 pub fn hash64(args: anytype) u64 {

@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const clap = @import("clap");
 const zignodamus = @import("zignodamus");
 
@@ -88,10 +89,12 @@ fn mainInner(init: std.process.Init) !void {
         },
     };
 
-    if (options.config.num_threads <= 1) {
-        _ = mallopt(M_TRIM_THRESHOLD, -1);
-        _ = mallopt(M_MMAP_THRESHOLD, 256 * 1024 * 1024);
-        _ = mallopt(M_ARENA_MAX, 1);
+    if (comptime builtin.abi.isGnu()) {
+        if (options.config.num_threads <= 1) {
+            _ = mallopt(M_TRIM_THRESHOLD, -1);
+            _ = mallopt(M_MMAP_THRESHOLD, 256 * 1024 * 1024);
+            _ = mallopt(M_ARENA_MAX, 1);
+        }
     }
 
     try zignodamus.run(init.io, init.gpa, options);

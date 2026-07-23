@@ -58,7 +58,7 @@ fn Interner(comptime T: type) type {
         fn place(self: *Self, h: u64, r: *const T) void {
             const f = h2(h);
             const mask = self.cap - 1;
-            var pos = h & mask;
+            var pos: usize = @intCast(h & mask);
             var stride: usize = 16;
             while (true) {
                 const empties = matchByte(self.loadGroup(pos), ctrl_empty);
@@ -104,7 +104,7 @@ fn Interner(comptime T: type) type {
             const h = structHashRef(T, v);
             const f = h2(h);
             const mask = self.cap - 1;
-            var pos = h & mask;
+            var pos: usize = @intCast(h & mask);
             var stride: usize = 16;
             while (true) {
                 const g = self.loadGroup(pos);
@@ -144,7 +144,7 @@ fn Interner(comptime T: type) type {
         fn placeUniqueRef(self: *Self, h: u64, r: Slot) void {
             const f = h2(h);
             const mask = self.cap - 1;
-            var pos = h & mask;
+            var pos: usize = @intCast(h & mask);
             var stride: usize = 16;
             while (true) {
                 const g = self.loadGroup(pos);
@@ -184,7 +184,7 @@ fn Interner(comptime T: type) type {
             var shift: usize = 0;
             while (shift < bits) : (shift += 8) {
                 var counts = [_]usize{0} ** 256;
-                for (src) |e| counts[(e.hash >> @intCast(shift)) & 0xff] += 1;
+                for (src) |e| counts[@as(usize, @intCast((e.hash >> @intCast(shift)) & 0xff))] += 1;
                 var sum: usize = 0;
                 for (&counts) |*c| {
                     const t = c.*;
@@ -192,7 +192,7 @@ fn Interner(comptime T: type) type {
                     sum += t;
                 }
                 for (src) |e| {
-                    const d = (e.hash >> @intCast(shift)) & 0xff;
+                    const d: usize = @intCast((e.hash >> @intCast(shift)) & 0xff);
                     dst[counts[d]] = e;
                     counts[d] += 1;
                 }

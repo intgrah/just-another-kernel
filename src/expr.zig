@@ -44,8 +44,6 @@ pub const LetData = struct {
     binder_type: ExprPtr,
     val: ExprPtr,
     body: ExprPtr,
-    num_loose_bvars: u16,
-    has_fvars: bool,
     nondep: bool,
 };
 
@@ -64,8 +62,6 @@ pub const Expr = struct {
             ty_name: NamePtr,
             idx: usize,
             structure: ExprPtr,
-            num_loose_bvars: u16,
-            has_fvars: bool,
         },
         @"var": struct {
             dbj_idx: u16,
@@ -80,24 +76,18 @@ pub const Expr = struct {
         app: struct {
             fun: ExprPtr,
             arg: ExprPtr,
-            num_loose_bvars: u16,
-            has_fvars: bool,
         },
         pi: struct {
             binder_name: NamePtr,
             binder_style: BinderStyle,
             binder_type: ExprPtr,
             body: ExprPtr,
-            num_loose_bvars: u16,
-            has_fvars: bool,
         },
         lambda: struct {
             binder_name: NamePtr,
             binder_style: BinderStyle,
             binder_type: ExprPtr,
             body: ExprPtr,
-            num_loose_bvars: u16,
-            has_fvars: bool,
         },
         let: struct {
             data: *const LetData,
@@ -116,30 +106,6 @@ pub const Expr = struct {
 
     pub fn getHash(self: *const Expr) u64 {
         return self.hash;
-    }
-
-    pub fn numLooseBvars(self: *const Expr) u16 {
-        return switch (self.kind) {
-            .sort, .@"const", .local, .string_lit, .nat_lit => 0,
-            .@"var" => |x| x.dbj_idx + 1,
-            .app => |x| x.num_loose_bvars,
-            .pi => |x| x.num_loose_bvars,
-            .lambda => |x| x.num_loose_bvars,
-            .let => |x| x.data.num_loose_bvars,
-            .proj => |x| x.num_loose_bvars,
-        };
-    }
-
-    pub fn hasFvars(self: *const Expr) bool {
-        return switch (self.kind) {
-            .local => true,
-            .@"var", .sort, .@"const", .nat_lit, .string_lit => false,
-            .app => |x| x.has_fvars,
-            .pi => |x| x.has_fvars,
-            .lambda => |x| x.has_fvars,
-            .let => |x| x.data.has_fvars,
-            .proj => |x| x.has_fvars,
-        };
     }
 };
 
@@ -161,7 +127,7 @@ pub fn inst(self: *TcCtx, e: ExprPtr, substs: []const ExprPtr) ExprPtr {
 }
 
 fn instAux(self: *TcCtx, e: ExprPtr, substs: []const ExprPtr, offset: u16) ExprPtr {
-    if (expr.numLooseBvars(e) <= offset) {
+    if (e.numLooseBvars() <= offset) {
         return e;
     } else if (self.expr_cache.inst_cache.get(.{ e, offset })) |cached| {
         return cached;
@@ -214,7 +180,7 @@ pub fn replaceParams(self: *TcCtx, e_in: ExprPtr, ingoing: []const ExprPtr, outg
 }
 
 fn abstrAuxLevels(self: *TcCtx, e: ExprPtr, start_pos: u16, num_open_binders: u16) ExprPtr {
-    if (!expr.hasFvars(e)) {
+    if (!e.hasFvars()) {
         return e;
     } else if (self.expr_cache.abstr_cache_levels.get(.{ e, start_pos, num_open_binders })) |cached| {
         return cached;
@@ -266,7 +232,7 @@ pub fn abstrLevels(self: *TcCtx, e: ExprPtr, start_pos: u16) ExprPtr {
 }
 
 fn abstrAux(self: *TcCtx, e: ExprPtr, locals: []const ExprPtr, offset: u16) ExprPtr {
-    if (!expr.hasFvars(e)) {
+    if (!e.hasFvars()) {
         return e;
     } else if (self.expr_cache.abstr_cache.get(.{ e, offset })) |cached| {
         return cached;
@@ -715,12 +681,4 @@ pub fn getMajorInduct(rec: *const env.RecursorData) ?NamePtr {
     } else {
         return null;
     }
-}
-
-pub fn numLooseBvars(e: ExprPtr) u16 {
-    return e.asRef().numLooseBvars();
-}
-
-pub fn hasFvars(e: ExprPtr) bool {
-    return e.asRef().hasFvars();
 }

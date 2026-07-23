@@ -199,8 +199,6 @@ pub fn mkApp(self: *TcCtx, fun: ExprPtr, arg: ExprPtr) ExprPtr {
     const e: expr.Expr = .mk(.{ .app = .{
         .fun = fun,
         .arg = arg,
-        .num_loose_bvars = @max(expr.numLooseBvars(fun), expr.numLooseBvars(arg)),
-        .has_fvars = expr.hasFvars(fun) or expr.hasFvars(arg),
     } });
     return allocExpr(self, &e);
 }
@@ -217,8 +215,6 @@ pub fn mkLambda(
         .binder_style = binder_style,
         .binder_type = binder_type,
         .body = body,
-        .num_loose_bvars = @max(expr.numLooseBvars(binder_type), (expr.numLooseBvars(body) -| 1)),
-        .has_fvars = expr.hasFvars(binder_type) or expr.hasFvars(body),
     } });
     return allocExpr(self, &e);
 }
@@ -235,8 +231,6 @@ pub fn mkPi(
         .binder_style = binder_style,
         .binder_type = binder_type,
         .body = body,
-        .num_loose_bvars = @max(expr.numLooseBvars(binder_type), (expr.numLooseBvars(body) -| 1)),
-        .has_fvars = expr.hasFvars(binder_type) or expr.hasFvars(body),
     } });
     return allocExpr(self, &e);
 }
@@ -255,11 +249,6 @@ pub fn mkLet(
         .binder_type = binder_type,
         .val = val,
         .body = body,
-        .num_loose_bvars = @max(
-            expr.numLooseBvars(binder_type),
-            @max(expr.numLooseBvars(val), (expr.numLooseBvars(body) -| 1)),
-        ),
-        .has_fvars = expr.hasFvars(binder_type) or expr.hasFvars(val) or expr.hasFvars(body),
         .nondep = nondep,
     };
     const e: expr.Expr = .mk(.{ .let = .{ .data = d } });
@@ -271,8 +260,6 @@ pub fn mkProj(self: *TcCtx, ty_name: NamePtr, idx: usize, structure: ExprPtr) Ex
         .ty_name = ty_name,
         .idx = idx,
         .structure = structure,
-        .num_loose_bvars = expr.numLooseBvars(structure),
-        .has_fvars = expr.hasFvars(structure),
     } });
     return allocExpr(self, &e);
 }
