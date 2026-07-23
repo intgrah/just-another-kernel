@@ -18,19 +18,9 @@ const StringPtr = ptr.StringPtr;
 const BigUintPtr = ptr.BigUintPtr;
 const FxHashMap = swiss_map.FxHashMap;
 
-const tagHash = @import("hash.zig").tagHash;
+const TagHashes = @import("hash.zig").TagHashes;
 
-pub const var_hash: u64 = tagHash(Expr.Kind, .@"var");
-pub const sort_hash: u64 = tagHash(Expr.Kind, .sort);
-pub const const_hash: u64 = tagHash(Expr.Kind, .@"const");
-pub const proj_hash: u64 = tagHash(Expr.Kind, .proj);
-pub const lambda_hash: u64 = tagHash(Expr.Kind, .lambda);
-pub const let_hash: u64 = tagHash(Expr.Kind, .let);
-pub const pi_hash: u64 = tagHash(Expr.Kind, .pi);
-pub const app_hash: u64 = tagHash(Expr.Kind, .app);
-pub const local_hash: u64 = tagHash(Expr.Kind, .local);
-pub const string_lit_hash: u64 = tagHash(Expr.Kind, .string_lit);
-pub const nat_lit_hash: u64 = tagHash(Expr.Kind, .nat_lit);
+pub const hashes: TagHashes(Expr.Kind) = .{};
 
 pub const FVarId = union(enum) {
     dbj_level: u16,

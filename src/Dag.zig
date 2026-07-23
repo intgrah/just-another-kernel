@@ -49,7 +49,7 @@ fn findName(self: *const Dag, anon: NamePtr, dot_separated_name: []const u8) ?Na
     var it = std.mem.splitScalar(u8, dot_separated_name, '.');
     while (it.next()) |s| {
         if (std.fmt.parseInt(u64, s, 10)) |parsed_num| {
-            const h = hash64(.{ name.num_hash, pfx, parsed_num });
+            const h = hash64(.{ name.hashes.num_hash, pfx, parsed_num });
             const probe = name.Name{ .hash = h, .kind = .{ .num = .{ .pfx = pfx, .n = parsed_num } } };
             if (self.names.get(&probe)) |r| {
                 pfx = NamePtr.global(r);
@@ -57,7 +57,7 @@ fn findName(self: *const Dag, anon: NamePtr, dot_separated_name: []const u8) ?Na
             }
         } else |_| {
             if (self.getStringPtr(s)) |sfx| {
-                const h = hash64(.{ name.str_hash, pfx, sfx });
+                const h = hash64(.{ name.hashes.str_hash, pfx, sfx });
                 const probe = name.Name{ .hash = h, .kind = .{ .str = .{ .pfx = pfx, .sfx = sfx } } };
                 if (self.names.get(&probe)) |r| {
                     pfx = NamePtr.global(r);

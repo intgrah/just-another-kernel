@@ -18,6 +18,18 @@ pub fn tagHash(comptime U: type, comptime tag: std.meta.Tag(U)) u64 {
     return std.hash.Fnv1a_64.hash(@typeName(U) ++ "." ++ @tagName(tag));
 }
 
+pub fn TagHashes(comptime U: type) type {
+    const tags = std.meta.tags(std.meta.Tag(U));
+    var names: [tags.len][:0]const u8 = undefined;
+    var attrs: [tags.len]std.builtin.Type.StructField.Attributes = undefined;
+    for (&names, &attrs, tags) |*n, *a, tag| {
+        const h: u64 = tagHash(U, tag);
+        n.* = @tagName(tag) ++ "_hash";
+        a.* = .{ .default_value_ptr = &h, .@"comptime" = true };
+    }
+    return @Struct(.auto, null, &names, &@splat(u64), &attrs);
+}
+
 pub fn hash64(args: anytype) u64 {
     var hasher = FxHasher{};
     inline for (args) |a| {
