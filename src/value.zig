@@ -16,8 +16,6 @@ pub const E = *const Env;
 pub const C = *const Ctx;
 pub const S = *const Spine;
 
-pub const OnceCell = util.OnceCell;
-
 pub const Closure = struct {
     env: E,
     body: ExprPtr,
@@ -76,14 +74,14 @@ pub const Value = union(enum) {
     unfold: struct {
         head: UnfoldHead,
         spine: S,
-        head_value: *OnceCell(V),
-        forced: OnceCell(V),
+        head_value: *?V,
+        forced: ?V,
     },
     lam: struct {
         binder_name: NamePtr,
         binder_style: BinderStyle,
         binder_type: ExprPtr,
-        domain: OnceCell(V),
+        domain: ?V,
         body: Closure,
     },
     pi: struct {
@@ -104,7 +102,7 @@ pub const Value = union(enum) {
     thunk: struct {
         env: E,
         expr: ExprPtr,
-        forced: OnceCell(V),
+        forced: ?V,
     },
 };
 
@@ -231,14 +229,14 @@ pub fn mkUnfold(
     name: NamePtr,
     levels: LevelsPtr,
     spine: S,
-    head_value: *OnceCell(V),
+    head_value: *?V,
 ) V {
     const v = arena.create(Value);
     v.* = .{ .unfold = .{
         .head = .{ .name = name, .levels = levels },
         .spine = spine,
         .head_value = head_value,
-        .forced = OnceCell(V).empty,
+        .forced = null,
     } };
     return v;
 }
@@ -247,13 +245,10 @@ pub fn mkUnfoldHeadWithEmpty(
     arena: *Arena,
     name: NamePtr,
     levels: LevelsPtr,
-    head_value: *OnceCell(V),
+    head_value: *?V,
     empty: S,
 ) V {
-    var forced = OnceCell(V).empty;
-    if (head_value.get()) |hv| {
-        forced.set(hv);
-    }
+    const forced = head_value.*;
     const v = arena.create(Value);
     v.* = .{ .unfold = .{
         .head = .{ .name = name, .levels = levels },
@@ -276,7 +271,7 @@ pub fn mkLam(
         .binder_name = binder_name,
         .binder_style = binder_style,
         .binder_type = binder_type,
-        .domain = OnceCell(V).empty,
+        .domain = null,
         .body = body,
     } };
     return v;
@@ -337,6 +332,6 @@ pub fn mkRigidHeadWithEmpty(arena: *Arena, head: RigidHead, empty: S) V {
 
 pub fn mkThunk(arena: *Arena, env: E, expr: ExprPtr) V {
     const v = arena.create(Value);
-    v.* = .{ .thunk = .{ .env = env, .expr = expr, .forced = OnceCell(V).empty } };
+    v.* = .{ .thunk = .{ .env = env, .expr = expr, .forced = null } };
     return v;
 }

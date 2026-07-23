@@ -29,7 +29,6 @@ const RigidHead = value.RigidHead;
 const Spine = value.Spine;
 const Value = value.Value;
 const BigUint = nat.BigUint;
-const OnceCell = util.OnceCell;
 const E = value.E;
 const S = value.S;
 const V = value.V;
@@ -71,7 +70,7 @@ pub fn mkBvarHc(self: *TypeChecker, level: u32, ty: V) V {
     return v;
 }
 
-fn mkUnfoldHc(self: *TypeChecker, name: NamePtr, levels: LevelsPtr, spine: S, head_value: *OnceCell(V)) V {
+fn mkUnfoldHc(self: *TypeChecker, name: NamePtr, levels: LevelsPtr, spine: S, head_value: *?V) V {
     const key = .{ name, levels, @intFromPtr(spine), @intFromPtr(head_value) };
     const gop = self.tc_cache.unfold_hc.getOrPut(util.smp_allocator, key) catch util.oom();
     if (gop.found_existing) return gop.value_ptr.*;
@@ -409,8 +408,8 @@ pub fn evalConst(self: *TypeChecker, name: NamePtr, levels: LevelsPtr) V {
     const empty = value.spineEmpty();
     const v = if (self.env.getDeclar(name)) |dptr| switch (dptr.*) {
         .definition, .theorem => blk: {
-            const cell = self.arena.create(OnceCell(V));
-            cell.* = OnceCell(V).empty;
+            const cell = self.arena.create(?V);
+            cell.* = null;
             break :blk value.mkUnfoldHeadWithEmpty(self.arena, name, levels, cell, empty);
         },
         .constructor => value.mkRigidHeadWithEmpty(self.arena, RigidHead{ .ctor = .{ .name = name, .levels = levels } }, empty),
@@ -463,11 +462,11 @@ pub fn constHeadType(self: *TypeChecker, name: NamePtr, levels: LevelsPtr) V {
 pub inline fn forceThunk(self: *TypeChecker, depth: u32, v: V) V {
     if (v.* == .thunk) {
         const t = v.thunk;
-        if (t.forced.get()) |r| {
+        if (t.forced) |r| {
             return r;
         }
         const r = eval(self, depth, t.env, t.expr);
-        v.thunk.forced.set(r);
+        v.thunk.forced = r;
         return r;
     }
     return v;
@@ -476,13 +475,13 @@ pub inline fn forceThunk(self: *TypeChecker, depth: u32, v: V) V {
 pub fn lamDomain(self: *TypeChecker, depth: u32, v: V) V {
     switch (v.*) {
         .lam => |l| {
-            if (l.domain.get()) |d| {
+            if (l.domain) |d| {
                 return d;
             }
             const e = l.body.env;
             const bt = l.binder_type;
             const d = eval(self, depth, e, bt);
-            v.lam.domain.set(d);
+            v.lam.domain = d;
             return d;
         },
         .pi => |p| return p.domain,
@@ -605,9 +604,8 @@ pub fn valueType(self: *TypeChecker, depth: u32, v0: V) V {
         },
         .unfold => |u| {
             const head_ty = constHeadType(self, u.head.name, u.head.levels);
-            const cell = self.arena.create(OnceCell(V));
-            cell.* = OnceCell(V).empty;
-            _ = cell.set(head_ty);
+            const cell = self.arena.create(?V);
+            cell.* = head_ty;
             const prev = value.mkUnfoldHeadWithEmpty(self.arena, u.head.name, u.head.levels, cell, value.spineEmpty());
             return spineTypeWithValue(self, depth, head_ty, prev, u.spine);
         },
@@ -1019,14 +1017,14 @@ pub fn unfoldValueDemand(self: *TypeChecker, depth: u32, v: V) V {
 fn unfoldValueGo(self: *TypeChecker, depth: u32, v: V, force: bool) V {
     if (v.* == .unfold) {
         const u = v.unfold;
-        if (u.forced.get()) |f| {
+        if (u.forced) |f| {
             return f;
         }
         if (self.nat_extension and isNatRedName(self, u.head.name)) {
             if (spineApps(self, depth, u.spine)) |args| {
                 defer self.ctx.bump.free(args);
                 if (doNatRed(self, depth, u.head.name, args)) |r| {
-                    v.unfold.forced.set(r);
+                    v.unfold.forced = r;
                     return r;
                 }
                 if (!force and natRedDefer(self, depth, u.head.name, args)) {
@@ -1034,13 +1032,13 @@ fn unfoldValueGo(self: *TypeChecker, depth: u32, v: V, force: bool) V {
                 }
             }
         }
-        const head_value = if (u.head_value.get()) |hv|
+        const head_value = if (u.head_value.*) |hv|
             hv
         else if (unfoldConst(self, u.head.name, u.head.levels)) |hv| blk: {
-            _ = v.unfold.head_value.set(hv);
+            v.unfold.head_value.* = hv;
             break :blk hv;
         } else {
-            v.unfold.forced.set(v);
+            v.unfold.forced = v;
             return v;
         };
         const spine = u.spine;
@@ -1053,7 +1051,7 @@ fn unfoldValueGo(self: *TypeChecker, depth: u32, v: V, force: bool) V {
             else
                 doProj(self, depth, elim.projTyName(), elim.projIdx(), cur);
         }
-        v.unfold.forced.set(cur);
+        v.unfold.forced = cur;
         return cur;
     }
     return v;
@@ -1610,7 +1608,7 @@ fn valueToBignumAt(self: *TypeChecker, depth: u32, v: V, deep: bool) ?BigUint {
                 else => return null,
             },
             .unfold => |u| {
-                if (u.head_value.get()) |hv| {
+                if (u.head_value.*) |hv| {
                     if (hv.* == .nat_lit) {
                         const bn = hv.nat_lit.ptr.asRef();
                         if (succs == 0) return nat.clone(bn);
