@@ -19,6 +19,7 @@ const params = clap.parseParamsComptime(
     \\    --permit-axiom <str>...           Permit an axiom by name (repeatable).
     \\    --no-unpermitted-axiom-hard-error Do not hard-error on unpermitted axioms.
     \\    --print-success                   Print a success message.
+    \\    --parse-only                      Exit after parsing, without checking.
     \\    --use-stdin                       Read the export file from stdin.
     \\<str>                                 Path to the export file.
     \\
@@ -144,7 +145,7 @@ fn mainInner(init: std.process.Init) !void {
 
     const export_file, const skipped_axioms = try parser.parseExportFile(&global_arena, input.bytes(), config);
     input.release(gpa);
-    if (init.minimal.environ.getPosix("PARSE_ONLY") != null) {
+    if (res.args.@"parse-only" != 0) {
         std.process.exit(0);
     }
 
