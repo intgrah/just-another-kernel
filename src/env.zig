@@ -1,9 +1,10 @@
 const std = @import("std");
-
-const NamePtr = @import("ptr.zig").NamePtr;
-const LevelsPtr = @import("ptr.zig").LevelsPtr;
-const ExprPtr = @import("ptr.zig").ExprPtr;
+const ptr = @import("ptr.zig");
 const swiss_map = @import("swiss_map.zig");
+
+const NamePtr = ptr.NamePtr;
+const LevelsPtr = ptr.LevelsPtr;
+const ExprPtr = ptr.ExprPtr;
 const FxIndexMap = swiss_map.FxIndexMap;
 
 pub const ReducibilityHint = union(enum) {

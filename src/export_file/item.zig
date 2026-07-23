@@ -6,13 +6,14 @@ const level = @import("../level.zig");
 const expr = @import("../expr.zig");
 const nat = @import("../nat.zig");
 const parser = @import("parser.zig");
+const ptr = @import("../ptr.zig");
 
-const NamePtr = @import("../ptr.zig").NamePtr;
-const LevelPtr = @import("../ptr.zig").LevelPtr;
-const LevelsPtr = @import("../ptr.zig").LevelsPtr;
-const ExprPtr = @import("../ptr.zig").ExprPtr;
-const StringPtr = @import("../ptr.zig").StringPtr;
-const BigUintPtr = @import("../ptr.zig").BigUintPtr;
+const NamePtr = ptr.NamePtr;
+const LevelPtr = ptr.LevelPtr;
+const LevelsPtr = ptr.LevelsPtr;
+const ExprPtr = ptr.ExprPtr;
+const StringPtr = ptr.StringPtr;
+const BigUintPtr = ptr.BigUintPtr;
 
 const Name = name.Name;
 const Level = level.Level;
@@ -35,33 +36,30 @@ fn resizeOpt(comptime T: type, list: *std.ArrayList(T), new_len: usize, nil: T) 
 }
 
 fn pushName(self: *Parser, expected: BackRef, n: Name) void {
-    const ptr = NamePtr.global(self.dag.names.insertUnique(self.arena, n));
     const i = @as(usize, expected.index());
     if (i >= self.names_by_idx.items.len) {
         resizeOpt(NamePtr, &self.names_by_idx, i + 1, name_nil);
     }
-    self.names_by_idx.items[i] = ptr;
+    self.names_by_idx.items[i] = NamePtr.global(self.dag.names.insertUnique(self.arena, n));
 }
 
 fn pushLevel(self: *Parser, expected: BackRef, l: Level) void {
-    const ptr = LevelPtr.global(self.dag.levels.insertUnique(self.arena, l));
     const i = @as(usize, expected.index());
     if (i >= self.levels_by_idx.items.len) {
         resizeOpt(LevelPtr, &self.levels_by_idx, i + 1, level_nil);
     }
-    self.levels_by_idx.items[i] = ptr;
+    self.levels_by_idx.items[i] = LevelPtr.global(self.dag.levels.insertUnique(self.arena, l));
 }
 
 fn pushExpr(self: *Parser, expected: BackRef, e: Expr) void {
     const r = self.arena.create(Expr);
     r.* = e;
     self.pending_exprs.append(util.smp_allocator, .{ .hash = e.hash, .ref = r }) catch util.oom();
-    const ptr = ExprPtr.global(r);
     const i = @as(usize, expected.index());
     if (i >= self.exprs_by_idx.items.len) {
         resizeOpt(ExprPtr, &self.exprs_by_idx, i + 1, expr_nil);
     }
-    self.exprs_by_idx.items[i] = ptr;
+    self.exprs_by_idx.items[i] = ExprPtr.global(r);
 }
 
 pub fn getNamePtr(self: *const Parser, idx: u32) ParseError!NamePtr {

@@ -5,16 +5,17 @@ const name = @import("name.zig");
 const env = @import("env.zig");
 const value = @import("value.zig");
 const nat = @import("nat.zig");
-const expr = @This();
-
 const TcCtx = @import("TcCtx.zig");
-const ExprPtr = @import("ptr.zig").ExprPtr;
-const LevelPtr = @import("ptr.zig").LevelPtr;
-const LevelsPtr = @import("ptr.zig").LevelsPtr;
-const NamePtr = @import("ptr.zig").NamePtr;
-const StringPtr = @import("ptr.zig").StringPtr;
-const BigUintPtr = @import("ptr.zig").BigUintPtr;
 const swiss_map = @import("swiss_map.zig");
+const ptr = @import("ptr.zig");
+
+const expr = @This();
+const ExprPtr = ptr.ExprPtr;
+const LevelPtr = ptr.LevelPtr;
+const LevelsPtr = ptr.LevelsPtr;
+const NamePtr = ptr.NamePtr;
+const StringPtr = ptr.StringPtr;
+const BigUintPtr = ptr.BigUintPtr;
 const FxHashMap = swiss_map.FxHashMap;
 
 pub const var_hash: u64 = 281;

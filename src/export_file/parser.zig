@@ -14,10 +14,11 @@ const json = @import("json.zig");
 const item = @import("item.zig");
 const fast = @import("fast.zig");
 const declar = @import("declar.zig");
+const ptr = @import("../ptr.zig");
 
-const NamePtr = @import("../ptr.zig").NamePtr;
-const LevelPtr = @import("../ptr.zig").LevelPtr;
-const ExprPtr = @import("../ptr.zig").ExprPtr;
+const NamePtr = ptr.NamePtr;
+const LevelPtr = ptr.LevelPtr;
+const ExprPtr = ptr.ExprPtr;
 
 const Name = name.Name;
 const Level = level.Level;
@@ -107,8 +108,7 @@ fn reclaimConsumed(input: []const u8, dropped: usize, consumed: usize) usize {
     const start = std.mem.alignForward(usize, base + dropped, page);
     const end = std.mem.alignBackward(usize, base + consumed, page);
     if (end <= start) return dropped;
-    const ptr: [*]align(std.heap.page_size_min) u8 = @ptrFromInt(start);
-    std.posix.madvise(ptr, end - start, std.posix.MADV.DONTNEED) catch return dropped;
+    std.posix.madvise(@ptrFromInt(start), end - start, std.posix.MADV.DONTNEED) catch return dropped;
     return end - base;
 }
 
