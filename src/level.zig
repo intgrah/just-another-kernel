@@ -2,10 +2,11 @@ const std = @import("std");
 const util = @import("util.zig");
 const name = @import("name.zig");
 const swiss_map = @import("swiss_map.zig");
+const ptr = @import("ptr.zig");
 
-const LevelPtr = @import("ptr.zig").LevelPtr;
-const LevelsPtr = @import("ptr.zig").LevelsPtr;
-const NamePtr = @import("ptr.zig").NamePtr;
+const LevelPtr = ptr.LevelPtr;
+const LevelsPtr = ptr.LevelsPtr;
+const NamePtr = ptr.NamePtr;
 const TcCtx = @import("TcCtx.zig");
 
 pub const zero_hash: u64 = 283;
@@ -73,16 +74,16 @@ fn combining(self: *TcCtx, l: LevelPtr, r: LevelPtr) LevelPtr {
     return TcCtx.max(self, l, r);
 }
 
-pub fn simplify(self: *TcCtx, ptr: LevelPtr) LevelPtr {
-    switch (ptr.asRef().kind) {
-        .zero, .param => return ptr,
+pub fn simplify(self: *TcCtx, lvl: LevelPtr) LevelPtr {
+    switch (lvl.asRef().kind) {
+        .zero, .param => return lvl,
         else => {},
     }
-    if (self.expr_cache.simplify_cache.get(ptr)) |cached| {
+    if (self.expr_cache.simplify_cache.get(lvl)) |cached| {
         return cached;
     }
-    const result = switch (ptr.asRef().kind) {
-        .zero, .param => ptr,
+    const result = switch (lvl.asRef().kind) {
+        .zero, .param => lvl,
         .succ => |p| blk: {
             const val = simplify(self, p);
             break :blk TcCtx.succ(self, val);
@@ -106,7 +107,7 @@ pub fn simplify(self: *TcCtx, ptr: LevelPtr) LevelPtr {
             }
         },
     };
-    self.expr_cache.simplify_cache.put(util.smp_allocator, ptr, result) catch util.oom();
+    self.expr_cache.simplify_cache.put(util.smp_allocator, lvl, result) catch util.oom();
     return result;
 }
 
