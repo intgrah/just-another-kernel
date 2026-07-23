@@ -70,59 +70,50 @@ fn findName(self: *const Dag, anon: NamePtr, dot_separated_name: []const u8) ?Na
     return pfx;
 }
 
+const name_cache_entries = [_]struct { [:0]const u8, []const u8 }{
+    .{ "quot", "Quot" },
+    .{ "quot_mk", "Quot.mk" },
+    .{ "quot_lift", "Quot.lift" },
+    .{ "quot_ind", "Quot.ind" },
+    .{ "string", "String" },
+    .{ "string_of_list", "String.ofList" },
+    .{ "nat", "Nat" },
+    .{ "nat_zero", "Nat.zero" },
+    .{ "nat_succ", "Nat.succ" },
+    .{ "nat_add", "Nat.add" },
+    .{ "nat_sub", "Nat.sub" },
+    .{ "nat_mul", "Nat.mul" },
+    .{ "nat_pow", "Nat.pow" },
+    .{ "nat_mod", "Nat.mod" },
+    .{ "nat_div", "Nat.div" },
+    .{ "nat_div_go", "Nat.div.go" },
+    .{ "nat_mod_core_go", "Nat.modCore.go" },
+    .{ "nat_beq", "Nat.beq" },
+    .{ "nat_ble", "Nat.ble" },
+    .{ "nat_gcd", "Nat.gcd" },
+    .{ "nat_xor", "Nat.xor" },
+    .{ "nat_land", "Nat.land" },
+    .{ "nat_lor", "Nat.lor" },
+    .{ "nat_shl", "Nat.shiftLeft" },
+    .{ "nat_shr", "Nat.shiftRight" },
+    .{ "bool_true", "Bool.true" },
+    .{ "bool_false", "Bool.false" },
+    .{ "char", "Char" },
+    .{ "char_of_nat", "Char.ofNat" },
+    .{ "list", "List" },
+    .{ "list_nil", "List.nil" },
+    .{ "list_cons", "List.cons" },
+};
+
 pub fn mkNameCache(self: *const Dag, anon: NamePtr) NameCache {
-    var cache: NameCache = .{
-        .quot = self.findName(anon, "Quot"),
-        .quot_mk = self.findName(anon, "Quot.mk"),
-        .quot_lift = self.findName(anon, "Quot.lift"),
-        .quot_ind = self.findName(anon, "Quot.ind"),
-        .string = self.findName(anon, "String"),
-        .string_of_list = self.findName(anon, "String.ofList"),
-        .nat = self.findName(anon, "Nat"),
-        .nat_zero = self.findName(anon, "Nat.zero"),
-        .nat_succ = self.findName(anon, "Nat.succ"),
-        .nat_add = self.findName(anon, "Nat.add"),
-        .nat_sub = self.findName(anon, "Nat.sub"),
-        .nat_mul = self.findName(anon, "Nat.mul"),
-        .nat_pow = self.findName(anon, "Nat.pow"),
-        .nat_mod = self.findName(anon, "Nat.mod"),
-        .nat_div = self.findName(anon, "Nat.div"),
-        .nat_div_go = self.findName(anon, "Nat.div.go"),
-        .nat_mod_core_go = self.findName(anon, "Nat.modCore.go"),
-        .nat_beq = self.findName(anon, "Nat.beq"),
-        .nat_ble = self.findName(anon, "Nat.ble"),
-        .nat_gcd = self.findName(anon, "Nat.gcd"),
-        .nat_xor = self.findName(anon, "Nat.xor"),
-        .nat_land = self.findName(anon, "Nat.land"),
-        .nat_lor = self.findName(anon, "Nat.lor"),
-        .nat_shl = self.findName(anon, "Nat.shiftLeft"),
-        .nat_shr = self.findName(anon, "Nat.shiftRight"),
-        .bool_true = self.findName(anon, "Bool.true"),
-        .bool_false = self.findName(anon, "Bool.false"),
-        .char = self.findName(anon, "Char"),
-        .char_of_nat = self.findName(anon, "Char.ofNat"),
-        .list = self.findName(anon, "List"),
-        .list_nil = self.findName(anon, "List.nil"),
-        .list_cons = self.findName(anon, "List.cons"),
-        .nat_red = .empty,
-    };
-    putNatRed(&cache, cache.nat_succ, .succ);
-    putNatRed(&cache, cache.nat_div_go, .div_go);
-    putNatRed(&cache, cache.nat_mod_core_go, .mod_core_go);
-    putNatRed(&cache, cache.nat_add, .add);
-    putNatRed(&cache, cache.nat_sub, .sub);
-    putNatRed(&cache, cache.nat_mul, .mul);
-    putNatRed(&cache, cache.nat_pow, .pow);
-    putNatRed(&cache, cache.nat_mod, .mod);
-    putNatRed(&cache, cache.nat_div, .div);
-    putNatRed(&cache, cache.nat_beq, .beq);
-    putNatRed(&cache, cache.nat_ble, .ble);
-    putNatRed(&cache, cache.nat_gcd, .gcd);
-    putNatRed(&cache, cache.nat_land, .land);
-    putNatRed(&cache, cache.nat_lor, .lor);
-    putNatRed(&cache, cache.nat_xor, .xor);
-    putNatRed(&cache, cache.nat_shl, .shl);
-    putNatRed(&cache, cache.nat_shr, .shr);
+    var cache: NameCache = undefined;
+    inline for (name_cache_entries) |entry| {
+        @field(cache, entry[0]) = self.findName(anon, entry[1]);
+    }
+    cache.nat_red = .empty;
+    inline for (comptime std.meta.tags(NatRed)) |t| {
+        putNatRed(&cache, @field(cache, "nat_" ++ @tagName(t)), t);
+    }
     return cache;
 }
 
@@ -150,38 +141,14 @@ pub const NatRed = enum {
     shr,
 };
 
-pub const NameCache = struct {
-    quot: ?NamePtr,
-    quot_mk: ?NamePtr,
-    quot_lift: ?NamePtr,
-    quot_ind: ?NamePtr,
-    nat: ?NamePtr,
-    nat_zero: ?NamePtr,
-    nat_succ: ?NamePtr,
-    nat_add: ?NamePtr,
-    nat_sub: ?NamePtr,
-    nat_mul: ?NamePtr,
-    nat_pow: ?NamePtr,
-    nat_mod: ?NamePtr,
-    nat_div: ?NamePtr,
-    nat_div_go: ?NamePtr,
-    nat_mod_core_go: ?NamePtr,
-    nat_beq: ?NamePtr,
-    nat_ble: ?NamePtr,
-    nat_gcd: ?NamePtr,
-    nat_xor: ?NamePtr,
-    nat_land: ?NamePtr,
-    nat_lor: ?NamePtr,
-    nat_shr: ?NamePtr,
-    nat_shl: ?NamePtr,
-    string: ?NamePtr,
-    string_of_list: ?NamePtr,
-    bool_false: ?NamePtr,
-    bool_true: ?NamePtr,
-    char: ?NamePtr,
-    char_of_nat: ?NamePtr,
-    list: ?NamePtr,
-    list_nil: ?NamePtr,
-    list_cons: ?NamePtr,
-    nat_red: FxHashMap(NamePtr, NatRed),
+pub const NameCache = blk: {
+    var names: [name_cache_entries.len + 1][:0]const u8 = undefined;
+    var types: [name_cache_entries.len + 1]type = undefined;
+    for (names[0..name_cache_entries.len], types[0..name_cache_entries.len], name_cache_entries) |*n, *t, entry| {
+        n.* = entry[0];
+        t.* = ?NamePtr;
+    }
+    names[name_cache_entries.len] = "nat_red";
+    types[name_cache_entries.len] = FxHashMap(NamePtr, NatRed);
+    break :blk @Struct(.auto, null, &names, &types, &@splat(.{}));
 };
