@@ -18,9 +18,7 @@ const StringPtr = ptr.StringPtr;
 const BigUintPtr = ptr.BigUintPtr;
 const FxHashMap = swiss_map.FxHashMap;
 
-const TagHashes = @import("hash.zig").TagHashes;
-
-pub const hashes: TagHashes(Expr.Kind) = .{};
+const kindHash = @import("hash.zig").kindHash;
 
 pub const FVarId = union(enum) {
     dbj_level: u16,
@@ -111,6 +109,10 @@ pub const Expr = struct {
             id: FVarId,
         },
     };
+
+    pub fn mk(kind: Kind) Expr {
+        return .{ .hash = kindHash(kind), .kind = kind };
+    }
 
     pub fn getHash(self: *const Expr) u64 {
         return self.hash;

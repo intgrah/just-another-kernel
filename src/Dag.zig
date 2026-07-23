@@ -5,7 +5,6 @@ const ptr = @import("ptr.zig");
 const util = @import("util.zig");
 const Config = @import("export_file.zig").Config;
 const FxHashMap = @import("swiss_map.zig").FxHashMap;
-const hash64 = @import("hash.zig").hash64;
 const NamePtr = ptr.NamePtr;
 const StringPtr = ptr.StringPtr;
 const smp_allocator = util.smp_allocator;
@@ -49,16 +48,14 @@ fn findName(self: *const Dag, anon: NamePtr, dot_separated_name: []const u8) ?Na
     var it = std.mem.splitScalar(u8, dot_separated_name, '.');
     while (it.next()) |s| {
         if (std.fmt.parseInt(u64, s, 10)) |parsed_num| {
-            const h = hash64(.{ name.hashes.num_hash, pfx, parsed_num });
-            const probe = name.Name{ .hash = h, .kind = .{ .num = .{ .pfx = pfx, .n = parsed_num } } };
+            const probe: name.Name = .mk(.{ .num = .{ .pfx = pfx, .n = parsed_num } });
             if (self.names.get(&probe)) |r| {
                 pfx = NamePtr.global(r);
                 continue;
             }
         } else |_| {
             if (self.getStringPtr(s)) |sfx| {
-                const h = hash64(.{ name.hashes.str_hash, pfx, sfx });
-                const probe = name.Name{ .hash = h, .kind = .{ .str = .{ .pfx = pfx, .sfx = sfx } } };
+                const probe: name.Name = .mk(.{ .str = .{ .pfx = pfx, .sfx = sfx } });
                 if (self.names.get(&probe)) |r| {
                     pfx = NamePtr.global(r);
                     continue;

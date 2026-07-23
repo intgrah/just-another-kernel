@@ -8,7 +8,6 @@ const util = @import("util.zig");
 const Dag = @import("Dag.zig");
 const ExportFile = @import("export_file.zig").ExportFile;
 const FxHashMap = @import("swiss_map.zig").FxHashMap;
-const hash64 = @import("hash.zig").hash64;
 const BigUint = @import("nat.zig").BigUint;
 const StringPtr = ptr.StringPtr;
 const NamePtr = ptr.NamePtr;
@@ -140,8 +139,7 @@ pub fn anonymous(self: *const TcCtx) NamePtr {
 }
 
 pub fn str(self: *TcCtx, pfx: NamePtr, sfx: StringPtr) NamePtr {
-    const hash = hash64(.{ name.hashes.str_hash, pfx, sfx });
-    return allocName(self, name.Name{ .hash = hash, .kind = .{ .str = .{ .pfx = pfx, .sfx = sfx } } });
+    return allocName(self, .mk(.{ .str = .{ .pfx = pfx, .sfx = sfx } }));
 }
 
 pub fn str1(self: *TcCtx, s: []const u8) NamePtr {
@@ -163,58 +161,47 @@ pub fn zero(self: *const TcCtx) LevelPtr {
 }
 
 pub fn num(self: *TcCtx, pfx: NamePtr, sfx: u64) NamePtr {
-    const hash = hash64(.{ name.hashes.num_hash, pfx, sfx });
-    return allocName(self, name.Name{ .hash = hash, .kind = .{ .num = .{ .pfx = pfx, .n = sfx } } });
+    return allocName(self, .mk(.{ .num = .{ .pfx = pfx, .n = sfx } }));
 }
 
 pub fn succ(self: *TcCtx, l: LevelPtr) LevelPtr {
-    const hash = hash64(.{ level.hashes.succ_hash, l });
-    return allocLevel(self, level.Level{ .hash = hash, .kind = .{ .succ = l } });
+    return allocLevel(self, .mk(.{ .succ = l }));
 }
 
 pub fn max(self: *TcCtx, l: LevelPtr, r: LevelPtr) LevelPtr {
-    const hash = hash64(.{ level.hashes.max_hash, l, r });
-    return allocLevel(self, level.Level{ .hash = hash, .kind = .{ .max = .{ .l = l, .r = r } } });
+    return allocLevel(self, .mk(.{ .max = .{ .l = l, .r = r } }));
 }
 
 pub fn imax(self: *TcCtx, l: LevelPtr, r: LevelPtr) LevelPtr {
-    const hash = hash64(.{ level.hashes.imax_hash, l, r });
-    return allocLevel(self, level.Level{ .hash = hash, .kind = .{ .imax = .{ .l = l, .r = r } } });
+    return allocLevel(self, .mk(.{ .imax = .{ .l = l, .r = r } }));
 }
 
 pub fn param(self: *TcCtx, n: NamePtr) LevelPtr {
-    const hash = hash64(.{ level.hashes.param_hash, n });
-    return allocLevel(self, level.Level{ .hash = hash, .kind = .{ .param = n } });
+    return allocLevel(self, .mk(.{ .param = n }));
 }
 
 pub fn mkVar(self: *TcCtx, dbj_idx: u16) ExprPtr {
-    const hash = hash64(.{ expr.hashes.var_hash, dbj_idx });
-    const e = expr.Expr{ .hash = hash, .kind = .{ .@"var" = .{ .dbj_idx = dbj_idx } } };
+    const e: expr.Expr = .mk(.{ .@"var" = .{ .dbj_idx = dbj_idx } });
     return allocExpr(self, &e);
 }
 
 pub fn mkSort(self: *TcCtx, lvl: LevelPtr) ExprPtr {
-    const hash = hash64(.{ expr.hashes.sort_hash, lvl });
-    const e = expr.Expr{ .hash = hash, .kind = .{ .sort = .{ .level = lvl } } };
+    const e: expr.Expr = .mk(.{ .sort = .{ .level = lvl } });
     return allocExpr(self, &e);
 }
 
 pub fn mkConst(self: *TcCtx, n: NamePtr, levels: LevelsPtr) ExprPtr {
-    const hash = hash64(.{ expr.hashes.const_hash, n, levels });
-    const e = expr.Expr{ .hash = hash, .kind = .{ .@"const" = .{ .name = n, .levels = levels } } };
+    const e: expr.Expr = .mk(.{ .@"const" = .{ .name = n, .levels = levels } });
     return allocExpr(self, &e);
 }
 
 pub fn mkApp(self: *TcCtx, fun: ExprPtr, arg: ExprPtr) ExprPtr {
-    const hash = hash64(.{ expr.hashes.app_hash, fun, arg });
-    const num_loose_bvars = @max(expr.numLooseBvars(fun), expr.numLooseBvars(arg));
-    const has_fvars = expr.hasFvars(fun) or expr.hasFvars(arg);
-    const e = expr.Expr{ .hash = hash, .kind = .{ .app = .{
+    const e: expr.Expr = .mk(.{ .app = .{
         .fun = fun,
         .arg = arg,
-        .num_loose_bvars = num_loose_bvars,
-        .has_fvars = has_fvars,
-    } } };
+        .num_loose_bvars = @max(expr.numLooseBvars(fun), expr.numLooseBvars(arg)),
+        .has_fvars = expr.hasFvars(fun) or expr.hasFvars(arg),
+    } });
     return allocExpr(self, &e);
 }
 
@@ -225,17 +212,14 @@ pub fn mkLambda(
     binder_type: ExprPtr,
     body: ExprPtr,
 ) ExprPtr {
-    const hash = hash64(.{ expr.hashes.lambda_hash, binder_name, binder_style, binder_type, body });
-    const num_loose_bvars = @max(expr.numLooseBvars(binder_type), (expr.numLooseBvars(body) -| 1));
-    const has_fvars = expr.hasFvars(binder_type) or expr.hasFvars(body);
-    const e = expr.Expr{ .hash = hash, .kind = .{ .lambda = .{
+    const e: expr.Expr = .mk(.{ .lambda = .{
         .binder_name = binder_name,
         .binder_style = binder_style,
         .binder_type = binder_type,
         .body = body,
-        .num_loose_bvars = num_loose_bvars,
-        .has_fvars = has_fvars,
-    } } };
+        .num_loose_bvars = @max(expr.numLooseBvars(binder_type), (expr.numLooseBvars(body) -| 1)),
+        .has_fvars = expr.hasFvars(binder_type) or expr.hasFvars(body),
+    } });
     return allocExpr(self, &e);
 }
 
@@ -246,17 +230,14 @@ pub fn mkPi(
     binder_type: ExprPtr,
     body: ExprPtr,
 ) ExprPtr {
-    const hash = hash64(.{ expr.hashes.pi_hash, binder_name, binder_style, binder_type, body });
-    const num_loose_bvars = @max(expr.numLooseBvars(binder_type), (expr.numLooseBvars(body) -| 1));
-    const has_fvars = expr.hasFvars(binder_type) or expr.hasFvars(body);
-    const e = expr.Expr{ .hash = hash, .kind = .{ .pi = .{
+    const e: expr.Expr = .mk(.{ .pi = .{
         .binder_name = binder_name,
         .binder_style = binder_style,
         .binder_type = binder_type,
         .body = body,
-        .num_loose_bvars = num_loose_bvars,
-        .has_fvars = has_fvars,
-    } } };
+        .num_loose_bvars = @max(expr.numLooseBvars(binder_type), (expr.numLooseBvars(body) -| 1)),
+        .has_fvars = expr.hasFvars(binder_type) or expr.hasFvars(body),
+    } });
     return allocExpr(self, &e);
 }
 
@@ -268,37 +249,31 @@ pub fn mkLet(
     body: ExprPtr,
     nondep: bool,
 ) ExprPtr {
-    const hash = hash64(.{ expr.hashes.let_hash, binder_name, binder_type, val, body, nondep });
-    const num_loose_bvars = @max(
-        expr.numLooseBvars(binder_type),
-        @max(expr.numLooseBvars(val), (expr.numLooseBvars(body) -| 1)),
-    );
-    const has_fvars = expr.hasFvars(binder_type) or expr.hasFvars(val) or expr.hasFvars(body);
     const d = self.arena.create(expr.LetData);
     d.* = .{
         .binder_name = binder_name,
         .binder_type = binder_type,
         .val = val,
         .body = body,
-        .num_loose_bvars = num_loose_bvars,
-        .has_fvars = has_fvars,
+        .num_loose_bvars = @max(
+            expr.numLooseBvars(binder_type),
+            @max(expr.numLooseBvars(val), (expr.numLooseBvars(body) -| 1)),
+        ),
+        .has_fvars = expr.hasFvars(binder_type) or expr.hasFvars(val) or expr.hasFvars(body),
         .nondep = nondep,
     };
-    const e = expr.Expr{ .hash = hash, .kind = .{ .let = .{ .data = d } } };
+    const e: expr.Expr = .mk(.{ .let = .{ .data = d } });
     return allocExpr(self, &e);
 }
 
 pub fn mkProj(self: *TcCtx, ty_name: NamePtr, idx: usize, structure: ExprPtr) ExprPtr {
-    const hash = hash64(.{ expr.hashes.proj_hash, ty_name, idx, structure });
-    const num_loose_bvars = expr.numLooseBvars(structure);
-    const has_fvars = expr.hasFvars(structure);
-    const e = expr.Expr{ .hash = hash, .kind = .{ .proj = .{
+    const e: expr.Expr = .mk(.{ .proj = .{
         .ty_name = ty_name,
         .idx = idx,
         .structure = structure,
-        .num_loose_bvars = num_loose_bvars,
-        .has_fvars = has_fvars,
-    } } };
+        .num_loose_bvars = expr.numLooseBvars(structure),
+        .has_fvars = expr.hasFvars(structure),
+    } });
     return allocExpr(self, &e);
 }
 
@@ -306,8 +281,7 @@ pub fn mkStringLit(self: *TcCtx, string_ptr: StringPtr) ?ExprPtr {
     if (!self.export_file.config.string_extension) {
         return null;
     }
-    const hash = hash64(.{ expr.hashes.string_lit_hash, string_ptr });
-    const e = expr.Expr{ .hash = hash, .kind = .{ .string_lit = .{ .ptr = string_ptr } } };
+    const e: expr.Expr = .mk(.{ .string_lit = .{ .ptr = string_ptr } });
     return allocExpr(self, &e);
 }
 
@@ -323,8 +297,7 @@ pub fn mkNatLit(self: *TcCtx, num_ptr: BigUintPtr) ?ExprPtr {
     if (!self.export_file.config.nat_extension) {
         return null;
     }
-    const hash = hash64(.{ expr.hashes.nat_lit_hash, num_ptr });
-    const e = expr.Expr{ .hash = hash, .kind = .{ .nat_lit = .{ .ptr = num_ptr } } };
+    const e: expr.Expr = .mk(.{ .nat_lit = .{ .ptr = num_ptr } });
     return allocExpr(self, &e);
 }
 
@@ -342,13 +315,12 @@ pub fn mkDbjLevel(
     const lvl = self.dbj_level_counter;
     self.dbj_level_counter += 1;
     const id = expr.FVarId{ .dbj_level = lvl };
-    const hash = hash64(.{ expr.hashes.local_hash, binder_name, binder_style, binder_type, id });
-    const e = expr.Expr{ .hash = hash, .kind = .{ .local = .{
+    const e: expr.Expr = .mk(.{ .local = .{
         .binder_name = binder_name,
         .binder_style = binder_style,
         .binder_type = binder_type,
         .id = id,
-    } } };
+    } });
     return allocExpr(self, &e);
 }
 
@@ -360,13 +332,12 @@ pub fn remakeDbjLevel(
     lvl: u16,
 ) ExprPtr {
     const id = expr.FVarId{ .dbj_level = lvl };
-    const hash = hash64(.{ expr.hashes.local_hash, binder_name, binder_style, binder_type, id });
-    const e = expr.Expr{ .hash = hash, .kind = .{ .local = .{
+    const e: expr.Expr = .mk(.{ .local = .{
         .binder_name = binder_name,
         .binder_style = binder_style,
         .binder_type = binder_type,
         .id = id,
-    } } };
+    } });
     return allocExpr(self, &e);
 }
 
@@ -379,13 +350,12 @@ pub fn mkUnique(
     const unique_id = self.unique_counter;
     self.unique_counter += 1;
     const id = expr.FVarId{ .unique = unique_id };
-    const hash = hash64(.{ expr.hashes.local_hash, binder_name, binder_style, binder_type, id });
-    const e = expr.Expr{ .hash = hash, .kind = .{ .local = .{
+    const e: expr.Expr = .mk(.{ .local = .{
         .binder_name = binder_name,
         .binder_style = binder_style,
         .binder_type = binder_type,
         .id = id,
-    } } };
+    } });
     return allocExpr(self, &e);
 }
 

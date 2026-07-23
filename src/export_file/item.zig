@@ -1,6 +1,5 @@
 const std = @import("std");
 const util = @import("../util.zig");
-const hash64 = @import("../hash.zig").hash64;
 const name = @import("../name.zig");
 const level = @import("../level.zig");
 const expr = @import("../expr.zig");
@@ -98,8 +97,7 @@ pub fn getUparamsPtr(self: *Parser, ta: std.mem.Allocator, name_idxs: []const u3
     var levels = ta.alloc(LevelPtr, name_idxs.len) catch util.oom();
     for (name_idxs, 0..) |name_idx, i| {
         const name_ptr = try getNamePtr(self, name_idx);
-        const hash = hash64(.{ level.hashes.param_hash, name_ptr });
-        const probe = Level{ .hash = hash, .kind = .{ .param = name_ptr } };
+        const probe: Level = .mk(.{ .param = name_ptr });
         const r = self.dag.levels.get(&probe) orelse return fail("levelParams entry is not a declared universe parameter");
         levels[i] = LevelPtr.global(r);
     }
@@ -129,15 +127,13 @@ pub fn doStr(self: *Parser, idx: BackRef, pre: u32, s: []const u8) ParseError!vo
     const pfx = try getNamePtr(self, pre);
     const owned = self.arena.dupe(u8, s);
     const sfx = StringPtr.global(self.dag.strings.intern(self.arena, owned));
-    const hash = hash64(.{ name.hashes.str_hash, pfx, sfx });
-    pushName(self, idx, Name{ .hash = hash, .kind = .{ .str = .{ .pfx = pfx, .sfx = sfx } } });
+    pushName(self, idx, .mk(.{ .str = .{ .pfx = pfx, .sfx = sfx } }));
 }
 
 pub fn doNum(self: *Parser, idx: BackRef, pre: u32, i: u32) ParseError!void {
     const pfx = try getNamePtr(self, pre);
     const sfx = @as(u64, i);
-    const hash = hash64(.{ name.hashes.num_hash, pfx, sfx });
-    pushName(self, idx, Name{ .hash = hash, .kind = .{ .num = .{ .pfx = pfx, .n = sfx } } });
+    pushName(self, idx, .mk(.{ .num = .{ .pfx = pfx, .n = sfx } }));
 }
 
 pub fn doNatVal(self: *Parser, idx: BackRef, s: []const u8) ParseError!void {
@@ -146,8 +142,7 @@ pub fn doNatVal(self: *Parser, idx: BackRef, s: []const u8) ParseError!void {
     }
     const big = nat.fromDecimal(s) orelse return fail("invalid BigUint decimal string");
     const num_ptr = BigUintPtr.global(self.dag.bignums.?.intern(self.arena, big));
-    const hash = hash64(.{ expr.hashes.nat_lit_hash, num_ptr });
-    pushExpr(self, idx, Expr{ .hash = hash, .kind = .{ .nat_lit = .{ .ptr = num_ptr } } });
+    pushExpr(self, idx, .mk(.{ .nat_lit = .{ .ptr = num_ptr } }));
 }
 
 pub fn doStrVal(self: *Parser, idx: BackRef, s: []const u8) ParseError!void {
@@ -156,101 +151,84 @@ pub fn doStrVal(self: *Parser, idx: BackRef, s: []const u8) ParseError!void {
     }
     const owned = self.arena.dupe(u8, s);
     const string_ptr = StringPtr.global(self.dag.strings.intern(self.arena, owned));
-    const hash = hash64(.{ expr.hashes.string_lit_hash, string_ptr });
-    pushExpr(self, idx, Expr{ .hash = hash, .kind = .{ .string_lit = .{ .ptr = string_ptr } } });
+    pushExpr(self, idx, .mk(.{ .string_lit = .{ .ptr = string_ptr } }));
 }
 
 pub fn doSucc(self: *Parser, idx: BackRef, prev: u32) ParseError!void {
     const l = try getLevelPtr(self, prev);
-    const hash = hash64(.{ level.hashes.succ_hash, l });
-    pushLevel(self, idx, Level{ .hash = hash, .kind = .{ .succ = l } });
+    pushLevel(self, idx, .mk(.{ .succ = l }));
 }
 
 pub fn doMax(self: *Parser, idx: BackRef, a: u32, b: u32) ParseError!void {
     const l = try getLevelPtr(self, a);
     const r = try getLevelPtr(self, b);
-    const hash = hash64(.{ level.hashes.max_hash, l, r });
-    pushLevel(self, idx, Level{ .hash = hash, .kind = .{ .max = .{ .l = l, .r = r } } });
+    pushLevel(self, idx, .mk(.{ .max = .{ .l = l, .r = r } }));
 }
 
 pub fn doImax(self: *Parser, idx: BackRef, a: u32, b: u32) ParseError!void {
     const l = try getLevelPtr(self, a);
     const r = try getLevelPtr(self, b);
-    const hash = hash64(.{ level.hashes.imax_hash, l, r });
-    pushLevel(self, idx, Level{ .hash = hash, .kind = .{ .imax = .{ .l = l, .r = r } } });
+    pushLevel(self, idx, .mk(.{ .imax = .{ .l = l, .r = r } }));
 }
 
 pub fn doLevelParam(self: *Parser, idx: BackRef, name_idx: u32) ParseError!void {
     const n = try getNamePtr(self, name_idx);
-    const hash = hash64(.{ level.hashes.param_hash, n });
-    pushLevel(self, idx, Level{ .hash = hash, .kind = .{ .param = n } });
+    pushLevel(self, idx, .mk(.{ .param = n }));
 }
 
 pub fn doSort(self: *Parser, idx: BackRef, level_idx: u32) ParseError!void {
     const lvl = try getLevelPtr(self, level_idx);
-    const hash = hash64(.{ expr.hashes.sort_hash, lvl });
-    pushExpr(self, idx, Expr{ .hash = hash, .kind = .{ .sort = .{ .level = lvl } } });
+    pushExpr(self, idx, .mk(.{ .sort = .{ .level = lvl } }));
 }
 
 pub fn doConst(self: *Parser, ta: std.mem.Allocator, idx: BackRef, name_idx: u32, us: []const u32) ParseError!void {
     const cname = try getNamePtr(self, name_idx);
     const levels = try getLevelsPtr(self, ta, us);
-    const hash = hash64(.{ expr.hashes.const_hash, cname, levels });
-    pushExpr(self, idx, Expr{ .hash = hash, .kind = .{ .@"const" = .{ .name = cname, .levels = levels } } });
+    pushExpr(self, idx, .mk(.{ .@"const" = .{ .name = cname, .levels = levels } }));
 }
 
 pub fn doApp(self: *Parser, idx: BackRef, fn_idx: u32, arg_idx: u32) ParseError!void {
     const fun = try getExprPtr(self, fn_idx);
     const arg = try getExprPtr(self, arg_idx);
-    const hash = hash64(.{ expr.hashes.app_hash, fun, arg });
-    const num_bvars = @max(fun.asRef().numLooseBvars(), arg.asRef().numLooseBvars());
-    const locals = fun.asRef().hasFvars() or arg.asRef().hasFvars();
-    pushExpr(self, idx, Expr{ .hash = hash, .kind = .{ .app = .{
+    pushExpr(self, idx, .mk(.{ .app = .{
         .fun = fun,
         .arg = arg,
-        .num_loose_bvars = num_bvars,
-        .has_fvars = locals,
-    } } });
+        .num_loose_bvars = @max(fun.asRef().numLooseBvars(), arg.asRef().numLooseBvars()),
+        .has_fvars = fun.asRef().hasFvars() or arg.asRef().hasFvars(),
+    } }));
 }
 
 pub fn doBvar(self: *Parser, idx: BackRef, dbj_idx: u16) ParseError!void {
     if (dbj_idx == std.math.maxInt(u16)) return fail("bvar index too large");
-    const hash = hash64(.{ expr.hashes.var_hash, dbj_idx });
-    pushExpr(self, idx, Expr{ .hash = hash, .kind = .{ .@"var" = .{ .dbj_idx = dbj_idx } } });
+    pushExpr(self, idx, .mk(.{ .@"var" = .{ .dbj_idx = dbj_idx } }));
 }
 
 pub fn doLam(self: *Parser, idx: BackRef, name_idx: u32, type_idx: u32, body_idx: u32, style: BinderStyle) ParseError!void {
     const binder_name = try getNamePtr(self, name_idx);
     const binder_type = try getExprPtr(self, type_idx);
     const body = try getExprPtr(self, body_idx);
-    const hash = hash64(.{ expr.hashes.lambda_hash, binder_name, style, binder_type, body });
-    const num_bvars = @max(binder_type.asRef().numLooseBvars(), (body.asRef().numLooseBvars() -| 1));
-    const locals = binder_type.asRef().hasFvars() or body.asRef().hasFvars();
-    pushExpr(self, idx, Expr{ .hash = hash, .kind = .{ .lambda = .{
+    pushExpr(self, idx, .mk(.{ .lambda = .{
         .binder_name = binder_name,
         .binder_style = style,
         .binder_type = binder_type,
         .body = body,
-        .num_loose_bvars = num_bvars,
-        .has_fvars = locals,
-    } } });
+        .num_loose_bvars = @max(binder_type.asRef().numLooseBvars(), (body.asRef().numLooseBvars() -| 1)),
+        .has_fvars = binder_type.asRef().hasFvars() or body.asRef().hasFvars(),
+    } }));
 }
 
 pub fn doPi(self: *Parser, idx: BackRef, name_idx: u32, type_idx: u32, body_idx: u32, style: BinderStyle) ParseError!void {
     const binder_name = try getNamePtr(self, name_idx);
     const binder_type = try getExprPtr(self, type_idx);
     const body = try getExprPtr(self, body_idx);
-    const hash = hash64(.{ expr.hashes.pi_hash, binder_name, style, binder_type, body });
-    const num_bvars = @max(binder_type.asRef().numLooseBvars(), (body.asRef().numLooseBvars() -| 1));
-    const locals = binder_type.asRef().hasFvars() or body.asRef().hasFvars();
-    pushExpr(self, idx, Expr{ .hash = hash, .kind = .{ .pi = .{
+    pushExpr(self, idx, .mk(.{ .pi = .{
         .binder_name = binder_name,
         .binder_style = style,
         .binder_type = binder_type,
         .body = body,
-        .num_loose_bvars = num_bvars,
-        .has_fvars = locals,
-    } } });
+        .num_loose_bvars = @max(binder_type.asRef().numLooseBvars(), (body.asRef().numLooseBvars() -| 1)),
+        .has_fvars = binder_type.asRef().hasFvars() or body.asRef().hasFvars(),
+    } }));
 }
 
 pub fn doLet(self: *Parser, idx: BackRef, name_idx: u32, type_idx: u32, value_idx: u32, body_idx: u32, nondep: bool) ParseError!void {
@@ -258,36 +236,30 @@ pub fn doLet(self: *Parser, idx: BackRef, name_idx: u32, type_idx: u32, value_id
     const binder_type = try getExprPtr(self, type_idx);
     const val = try getExprPtr(self, value_idx);
     const body = try getExprPtr(self, body_idx);
-    const hash = hash64(.{ expr.hashes.let_hash, binder_name, binder_type, val, body, nondep });
-    const num_bvars = @max(
-        binder_type.asRef().numLooseBvars(),
-        @max(val.asRef().numLooseBvars(), (body.asRef().numLooseBvars() -| 1)),
-    );
-    const locals = binder_type.asRef().hasFvars() or val.asRef().hasFvars() or body.asRef().hasFvars();
     const d = self.arena.create(expr.LetData);
     d.* = .{
         .binder_name = binder_name,
         .binder_type = binder_type,
         .val = val,
         .body = body,
-        .num_loose_bvars = num_bvars,
-        .has_fvars = locals,
+        .num_loose_bvars = @max(
+            binder_type.asRef().numLooseBvars(),
+            @max(val.asRef().numLooseBvars(), (body.asRef().numLooseBvars() -| 1)),
+        ),
+        .has_fvars = binder_type.asRef().hasFvars() or val.asRef().hasFvars() or body.asRef().hasFvars(),
         .nondep = nondep,
     };
-    pushExpr(self, idx, Expr{ .hash = hash, .kind = .{ .let = .{ .data = d } } });
+    pushExpr(self, idx, .mk(.{ .let = .{ .data = d } }));
 }
 
 pub fn doProj(self: *Parser, idx: BackRef, ty_name_idx: u32, proj_idx: usize, struct_idx: u32) ParseError!void {
     const ty_name = try getNamePtr(self, ty_name_idx);
     const structure = try getExprPtr(self, struct_idx);
-    const hash = hash64(.{ expr.hashes.proj_hash, ty_name, proj_idx, structure });
-    const num_bvars = structure.asRef().numLooseBvars();
-    const locals = structure.asRef().hasFvars();
-    pushExpr(self, idx, Expr{ .hash = hash, .kind = .{ .proj = .{
+    pushExpr(self, idx, .mk(.{ .proj = .{
         .ty_name = ty_name,
         .idx = proj_idx,
         .structure = structure,
-        .num_loose_bvars = num_bvars,
-        .has_fvars = locals,
-    } } });
+        .num_loose_bvars = structure.asRef().numLooseBvars(),
+        .has_fvars = structure.asRef().hasFvars(),
+    } }));
 }

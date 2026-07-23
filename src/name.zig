@@ -5,9 +5,7 @@ const NamePtr = @import("ptr.zig").NamePtr;
 const StringPtr = @import("ptr.zig").StringPtr;
 const TcCtx = @import("TcCtx.zig");
 
-const TagHashes = @import("hash.zig").TagHashes;
-
-pub const hashes: TagHashes(Name.Kind) = .{};
+const kindHash = @import("hash.zig").kindHash;
 
 pub const Name = struct {
     hash: u64,
@@ -19,7 +17,11 @@ pub const Name = struct {
         num: struct { pfx: NamePtr, n: u64 },
     };
 
-    pub const anon: Name = .{ .hash = hashes.anon_hash, .kind = .anon };
+    pub fn mk(kind: Kind) Name {
+        return .{ .hash = kindHash(kind), .kind = kind };
+    }
+
+    pub const anon: Name = mk(.anon);
 
     pub fn getHash(self: *const Name) u64 {
         return self.hash;

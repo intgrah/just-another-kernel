@@ -9,9 +9,7 @@ const LevelsPtr = ptr.LevelsPtr;
 const NamePtr = ptr.NamePtr;
 const TcCtx = @import("TcCtx.zig");
 
-const TagHashes = @import("hash.zig").TagHashes;
-
-pub const hashes: TagHashes(Level.Kind) = .{};
+const kindHash = @import("hash.zig").kindHash;
 
 pub const Level = struct {
     hash: u64,
@@ -27,7 +25,11 @@ pub const Level = struct {
 
     pub const Pair = struct { l: LevelPtr, r: LevelPtr };
 
-    pub const zero: Level = .{ .hash = hashes.zero_hash, .kind = .zero };
+    pub fn mk(kind: Kind) Level {
+        return .{ .hash = kindHash(kind), .kind = kind };
+    }
+
+    pub const zero: Level = mk(.zero);
 
     pub fn getHash(self: *const Level) u64 {
         return self.hash;

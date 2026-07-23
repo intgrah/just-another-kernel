@@ -14,20 +14,40 @@ pub const FxHasher = struct {
     }
 };
 
-pub fn tagHash(comptime U: type, comptime tag: std.meta.Tag(U)) u64 {
+fn tagHash(comptime U: type, comptime tag: std.meta.Tag(U)) u64 {
     return std.hash.Fnv1a_64.hash(@typeName(U) ++ "." ++ @tagName(tag));
 }
 
-pub fn TagHashes(comptime U: type) type {
-    const tags = std.meta.tags(std.meta.Tag(U));
-    var names: [tags.len][:0]const u8 = undefined;
-    var attrs: [tags.len]std.builtin.Type.StructField.Attributes = undefined;
-    for (&names, &attrs, tags) |*n, *a, tag| {
-        const h: u64 = tagHash(U, tag);
-        n.* = @tagName(tag) ++ "_hash";
-        a.* = .{ .default_value_ptr = &h, .@"comptime" = true };
+pub fn kindHash(kind: anytype) u64 {
+    switch (kind) {
+        inline else => |payload, tag| {
+            var hasher = FxHasher{};
+            hasher.writeU64(tagHash(@TypeOf(kind), tag));
+            feedPayload(&hasher, payload);
+            return hasher.finish();
+        },
     }
-    return @Struct(.auto, null, &names, &@splat(u64), &attrs);
+}
+
+fn feedPayload(hasher: *FxHasher, payload: anytype) void {
+    const T = @TypeOf(payload);
+    switch (@typeInfo(T)) {
+        .void => {},
+        .pointer => feedPayload(hasher, payload.*),
+        .@"struct" => |s| if (@hasDecl(T, "getHash")) {
+            hasher.writeU64(payload.getHash());
+        } else inline for (s.fields) |f| {
+            if (comptime !isDerived(f.name)) {
+                feedPayload(hasher, @field(payload, f.name));
+            }
+        },
+        else => hasher.writeU64(toU64(payload)),
+    }
+}
+
+fn isDerived(field_name: []const u8) bool {
+    return std.mem.eql(u8, field_name, "num_loose_bvars") or
+        std.mem.eql(u8, field_name, "has_fvars");
 }
 
 pub fn hash64(args: anytype) u64 {
