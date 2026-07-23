@@ -130,29 +130,51 @@ pub fn parseAxiom(self: *Parser, ta: std.mem.Allocator, v: Value) ParseError!voi
     }
 }
 
-pub fn parseDef(self: *Parser, ta: std.mem.Allocator, v: Value) ParseError!void {
-    const o = try json.asObject(v);
-    const safety = try parseSafety(o.get("safety") orelse return fail("missing safety"));
-    if (safety != .safe) return fail("unsafe and partial definitions are not supported");
-    const dname = try item.getNamePtr(self, try json.asU32(o.get("name") orelse return fail("missing name")));
-    const ty = try item.getExprPtr(self, try json.asU32(o.get("type") orelse return fail("missing type")));
-    const val = try item.getExprPtr(self, try json.asU32(o.get("value") orelse return fail("missing value")));
-    const uparams = try item.getUparamsPtr(self, ta, try json.asU32Array(ta, o.get("levelParams") orelse return fail("missing levelParams")));
-    const hint = try parseReducibilityHint(o.get("hints") orelse return fail("missing hints"));
+pub fn doDef(self: *Parser, ta: std.mem.Allocator, name_idx: u32, ty_idx: u32, val_idx: u32, uparam_idxs: []const u32, hint: ReducibilityHint) ParseError!void {
+    const dname = try item.getNamePtr(self, name_idx);
+    const ty = try item.getExprPtr(self, ty_idx);
+    const val = try item.getExprPtr(self, val_idx);
+    const uparams = try item.getUparamsPtr(self, ta, uparam_idxs);
     const info = DeclarInfo{ .name = dname, .ty = ty, .uparams = uparams };
     const definition = Declar{ .definition = .{ .info = info, .val = val, .hint = hint } };
     try insertDeclar(self, dname, definition);
 }
 
-pub fn parseThm(self: *Parser, ta: std.mem.Allocator, v: Value) ParseError!void {
-    const o = try json.asObject(v);
-    const tname = try item.getNamePtr(self, try json.asU32(o.get("name") orelse return fail("missing name")));
-    const ty = try item.getExprPtr(self, try json.asU32(o.get("type") orelse return fail("missing type")));
-    const val = try item.getExprPtr(self, try json.asU32(o.get("value") orelse return fail("missing value")));
-    const uparams = try item.getUparamsPtr(self, ta, try json.asU32Array(ta, o.get("levelParams") orelse return fail("missing levelParams")));
+pub fn doThm(self: *Parser, ta: std.mem.Allocator, name_idx: u32, ty_idx: u32, val_idx: u32, uparam_idxs: []const u32) ParseError!void {
+    const tname = try item.getNamePtr(self, name_idx);
+    const ty = try item.getExprPtr(self, ty_idx);
+    const val = try item.getExprPtr(self, val_idx);
+    const uparams = try item.getUparamsPtr(self, ta, uparam_idxs);
     const info = DeclarInfo{ .name = tname, .ty = ty, .uparams = uparams };
     const theorem = Declar{ .theorem = .{ .info = info, .val = val } };
     try insertDeclar(self, tname, theorem);
+}
+
+pub fn parseDef(self: *Parser, ta: std.mem.Allocator, v: Value) ParseError!void {
+    const o = try json.asObject(v);
+    const safety = try parseSafety(o.get("safety") orelse return fail("missing safety"));
+    if (safety != .safe) return fail("unsafe and partial definitions are not supported");
+    try doDef(
+        self,
+        ta,
+        try json.asU32(o.get("name") orelse return fail("missing name")),
+        try json.asU32(o.get("type") orelse return fail("missing type")),
+        try json.asU32(o.get("value") orelse return fail("missing value")),
+        try json.asU32Array(ta, o.get("levelParams") orelse return fail("missing levelParams")),
+        try parseReducibilityHint(o.get("hints") orelse return fail("missing hints")),
+    );
+}
+
+pub fn parseThm(self: *Parser, ta: std.mem.Allocator, v: Value) ParseError!void {
+    const o = try json.asObject(v);
+    try doThm(
+        self,
+        ta,
+        try json.asU32(o.get("name") orelse return fail("missing name")),
+        try json.asU32(o.get("type") orelse return fail("missing type")),
+        try json.asU32(o.get("value") orelse return fail("missing value")),
+        try json.asU32Array(ta, o.get("levelParams") orelse return fail("missing levelParams")),
+    );
 }
 
 pub fn parseOpaque(self: *Parser, ta: std.mem.Allocator, v: Value) ParseError!void {
