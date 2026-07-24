@@ -695,23 +695,7 @@ fn bodyMask(body: ExprPtr) u64 {
     const k = body.numLooseBvars();
     if (k == 0) return 0;
     if (k <= 64) return body.asRef().fv_mask >> 1;
-    if (k == 65) return shiftedMask(body, 1);
-    return 0;
-}
-
-fn shiftedMask(e: ExprPtr, d: u16) u64 {
-    const k = e.numLooseBvars();
-    if (k <= d) return 0;
-    if (k <= 64) return e.asRef().fv_mask >> @intCast(d);
-    return switch (e.asRef().kind) {
-        .@"var" => |x| @as(u64, 1) << @intCast(x.dbj_idx - d),
-        .app => |x| shiftedMask(x.fun, d) | shiftedMask(x.arg, d),
-        .pi => |x| shiftedMask(x.binder_type, d) | shiftedMask(x.body, d + 1),
-        .lambda => |x| shiftedMask(x.binder_type, d) | shiftedMask(x.body, d + 1),
-        .let => |x| shiftedMask(x.data.binder_type, d) | shiftedMask(x.data.val, d) | shiftedMask(x.data.body, d + 1),
-        .proj => |x| shiftedMask(x.structure, d),
-        .sort, .@"const", .local, .string_lit, .nat_lit => 0,
-    };
+    return std.math.maxInt(u64);
 }
 
 fn maskOf(kind: Expr.Kind) u64 {

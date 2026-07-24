@@ -214,7 +214,7 @@ fn pruneEnv(self: *TypeChecker, e: E, mask: u64) E {
 pub fn keyEnv(self: *TypeChecker, e: E, ex: ExprPtr) E {
     const k = ex.numLooseBvars();
     if (k == 0) return lsubBase(self, e.lsub);
-    if (k > 64) return truncEnv(self, e, k);
+    if (k > 64) return e;
     return pruneEnv(self, e, ex.asRef().fv_mask);
 }
 
